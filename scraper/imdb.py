@@ -274,6 +274,17 @@ def parse_ld_json(html: str) -> dict:
     return out
 
 
+def browser_fetcher(page):
+    """Return fetch(tid) that loads the title page in the already-open browser."""
+    def fetch(tid: str) -> dict:
+        page.goto(f"https://www.imdb.com/title/{tid}/", wait_until="domcontentloaded", timeout=45_000)
+        html = page.content()
+        if "application/ld+json" not in html:
+            raise RuntimeError("no title data on page (blocked or challenge)")
+        return parse_ld_json(html)
+    return fetch
+
+
 def fetch_title_details(tid: str) -> dict:
     import urllib.request
 
@@ -282,10 +293,13 @@ def fetch_title_details(tid: str) -> dict:
     req = urllib.request.Request(f"https://www.imdb.com/title/{tid}/",
                                  headers={"User-Agent": DESKTOP_UA, "Accept-Language": "en-US,en;q=0.9"})
     with urllib.request.urlopen(req, timeout=20) as r:
-        return parse_ld_json(r.read().decode("utf-8", "replace"))
+        html = r.read().decode("utf-8", "replace")
+    if "application/ld+json" not in html:
+        raise RuntimeError("no title data on page (blocked or challenge)")
+    return parse_ld_json(html)
 
 
-def backfill_details(store: Store, limit: int | None = None, delay: float = 1.0) -> int:
+def backfill_details(store: Store, limit: int | None = None, delay: float = 1.0, fetch=None) -> int:
     """Fill director and runtime for titles missing either (each title tried once)."""
     if limit is None:
         limit = int(os.environ.get("IMDB_DETAILS_PER_RUN", "60"))
@@ -294,7 +308,7 @@ def backfill_details(store: Store, limit: int | None = None, delay: float = 1.0)
     filled = 0
     for rec in todo:
         try:
-            got = fetch_title_details(rec["const_id"])
+            got = (fetch or fetch_title_details)(rec["const_id"])
         except Exception as e:
             log(f"IMDb details: {rec['const_id']} failed ({e}); will retry next run")
             continue
@@ -309,6 +323,87 @@ def backfill_details(store: Store, limit: int | None = None, delay: float = 1.0)
     return filled
 
 
+# ---------- diagnostics ----------
+
+def _find_paths(o, tid, path=""):
+    """JSON paths whose value mentions tid (to show where IMDb keeps a title's data)."""
+    hits = []
+    if isinstance(o, dict):
+        for k, v in o.items():
+            hits += _find_paths(v, tid, f"{path}.{k}")
+    elif isinstance(o, list):
+        for i, v in enumerate(o):
+            hits += _find_paths(v, tid, f"{path}[{i}]")
+    elif o == tid:
+        hits.append(path)
+    return hits
+
+
+def _at(o, path):
+    for part in re.findall(r"\.([^.\[]+)|\[(\d+)\]", path):
+        o = o[part[0]] if part[0] else o[int(part[1])]
+    return o
+
+
+def settle(page):
+    """Let the client-side app finish loading (ratings may arrive after first paint)."""
+    try:
+        page.wait_for_load_state("networkidle", timeout=20_000)
+    except Exception:
+        pass
+    try:
+        page.wait_for_function(
+            "document.body.innerText.includes('Rated on') || "
+            "document.querySelector(\"[data-testid*='other-user-rating'], .ipc-rating-star--otherUserAlsoRated\")",
+            timeout=10_000,
+        )
+    except Exception:
+        log("IMDb: no 'Rated on' text or user-rating stars appeared on the page")
+
+
+def diagnose_missing(html: str, batch: dict, limit: int = 2, gql_raw=None):
+    """Log how the page shows titles we couldn't read a rating/date for."""
+    missing = [k for k, r in batch.items() if r.get("user_rating") is None or not r.get("date_rated")][:limit]
+    if not missing:
+        return
+    log(f"IMDb diag: page mentions 'Rated on' {html.count('Rated on')}x; "
+        f"other-user-rating {html.count('other-user-rating')}x; graphql responses {len(gql_raw or [])}")
+    for url, body in (gql_raw or [])[:15]:
+        op = re.search(r"operationName=([^&]+)", url)
+        log(f"IMDb diag graphql {op.group(1) if op else url[:120]}: keys {list((body.get('data') or {}).keys())[:8]}")
+    soup = BeautifulSoup(html, "lxml")
+    tag = soup.find("script", id="__NEXT_DATA__")
+    blob = json.loads(tag.string) if tag and tag.string else {}
+    for tid in missing:
+        log(f"IMDb diag: {tid} has no rating/date after parsing")
+        for card in soup.select(".ipc-metadata-list-summary-item"):
+            if card.select_one(f"a[href*='/title/{tid}']"):
+                log("IMDb diag card text: " + card.get_text(" | ", strip=True)[:600])
+                labels = [e.get("aria-label") for e in card.select("[aria-label]")]
+                log("IMDb diag aria-labels: " + json.dumps(labels)[:600])
+                log("IMDb diag card html (tail): " + re.sub(r"\s+", " ", str(card))[-1500:])
+                break
+        for path in _find_paths(blob, tid)[:3]:
+            parts = re.findall(r"\.[^.\[]+|\[\d+\]", path)
+            for up in (3, 2):  # show the enclosing objects a few levels up
+                ctx_path = "".join(parts[:-up]) if len(parts) > up else ""
+                try:
+                    ctx = _at(blob, ctx_path)
+                except Exception:
+                    continue
+                log(f"IMDb diag json {ctx_path}: " + json.dumps(ctx)[:1200])
+        for url, body in gql_raw or []:
+            for path in _find_paths(body, tid)[:2]:
+                parts = re.findall(r"\.[^.\[]+|\[\d+\]", path)
+                ctx_path = "".join(parts[:-2]) if len(parts) > 2 else ""
+                try:
+                    ctx = _at(body, ctx_path)
+                except Exception:
+                    continue
+                op = re.search(r"operationName=([^&]+)", url)
+                log(f"IMDb diag graphql-json {op.group(1) if op else ''} {ctx_path}: " + json.dumps(ctx)[:2500])
+
+
 # ---------- runner ----------
 
 def run(full: bool = False, headful: bool = False, url: str | None = None, max_pages: int = 500) -> int:
@@ -318,11 +413,15 @@ def run(full: bool = False, headful: bool = False, url: str | None = None, max_p
     start = len(store)
     url = url or CFG["ratings_url"]
     gql: dict[str, dict] = {}
+    gql_raw: list = []  # kept for diagnostics
 
     def on_response(resp):
         if "graphql" in resp.url and "json" in (resp.headers.get("content-type") or ""):
             try:
-                gql.update(merge(gql, parse_json_titles(resp.json())))
+                body = resp.json()
+                if len(gql_raw) < 40:
+                    gql_raw.append((resp.url, body))
+                gql.update(merge(gql, parse_json_titles(body)))
             except Exception:
                 pass
 
@@ -338,12 +437,19 @@ def run(full: bool = False, headful: bool = False, url: str | None = None, max_p
         if "private" in page.content().lower() and not page.query_selector(".ipc-metadata-list-summary-item"):
             raise RuntimeError("IMDb ratings list is private — make it public in IMDb account settings")
 
+        settle(page)
         next_data = parse_next_data(page.content())
         seen_count, pages = 0, 1
         while pages < max_pages:
             cards = parse_cards(page.content())
             batch = merge(cards, next_data, gql)
-            new_here = sum(1 for k in batch if k not in store)
+            def incomplete(k):
+                r = store.records.get(k)
+                return r is None or r.get("user_rating") is None or not r.get("date_rated")
+
+            new_here = sum(1 for k in batch if incomplete(k))
+            if pages == 1:
+                diagnose_missing(page.content(), batch, limit=2, gql_raw=gql_raw)
             for rec in batch.values():
                 store.upsert(rec)
             log(f"IMDb: page {pages}: {len(cards)} cards on screen, {len(store) - start} new so far")
@@ -368,10 +474,10 @@ def run(full: bool = False, headful: bool = False, url: str | None = None, max_p
             if len(cards) == seen_count:
                 break
             seen_count = len(cards)
+        backfill_details(store, fetch=browser_fetcher(page))
         browser.close()
 
     backfill_posters(store)
-    backfill_details(store)
     store.save()
     log(f"IMDb: done — {len(store)} titles total, {len(store) - start} new")
     return len(store) - start

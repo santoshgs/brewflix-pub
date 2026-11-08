@@ -32,7 +32,7 @@ def imdb_card(i, t):
 </li>"""
 
 
-def imdb_page(titles=IMDB_TITLES, page_size=50):
+def imdb_page(titles=IMDB_TITLES, page_size=50, late_ratings=False):
     # __NEXT_DATA__ carries only the first page, like the real site
     nd = {"props": {"pageProps": {"mainColumnData": {"advancedTitleSearch": {"edges": [
         {"node": {"title": {"id": c, "titleText": {"text": t}, "releaseYear": {"year": y},
@@ -40,11 +40,22 @@ def imdb_page(titles=IMDB_TITLES, page_size=50):
                   "userRating": {"value": m, "date": d + "T12:00:00Z"}}}
         for c, t, y, ty, r, m, d in titles[:page_size]]}}}}}
     cards = [imdb_card(i + 1, t) for i, t in enumerate(titles)]
+    late = ""
+    if late_ratings:  # like the live site: first paint has no rating/date, they arrive ~1.5s later
+        import re as _re
+        first = cards[:page_size]
+        hidden = [_re.sub(r'<span data-testid="ratingGroup--other-user-rating".*?</div>', "", c, flags=_re.S) for c in first]
+        late = ("<script>setTimeout(()=>{const d=document.createElement('ul');d.innerHTML=document.getElementById('full').textContent;"
+                "document.getElementById('list').replaceChildren(...d.children);},1500)</script>"
+                f'<script type="text/html" id="full">{"".join(first)}</script>')
+        cards = hidden + cards[page_size:]
+        nd = {"props": {"pageProps": {"mainColumnData": {"advancedTitleSearch": {"edges": [
+            {"node": {"title": {"id": c, "titleText": {"text": t}}}} for c, t, *_ in titles[:page_size]]}}}}}
     return f"""<!doctype html><html><head><title>Your Ratings • IMDb</title>
 <script id="__NEXT_DATA__" type="application/json">{json.dumps(nd)}</script></head><body>
 <ul id="list">{''.join(cards[:page_size])}</ul>
 <span class="ipc-see-more"><button class="ipc-see-more__button">50 more</button></span>
-<script type="text/html" id="rest">{''.join(cards[page_size:])}</script>
+<script type="text/html" id="rest">{''.join(cards[page_size:])}</script>{late}
 <script>
 const tmp=document.createElement('ul'); tmp.innerHTML=document.getElementById('rest').textContent; const rest=[...tmp.children]; let shown=0;
 document.querySelector('.ipc-see-more__button').onclick=()=>setTimeout(()=>{{

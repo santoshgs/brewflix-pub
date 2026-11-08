@@ -72,6 +72,17 @@ def test_imdb_full_then_incremental():
     assert load("imdb_ratings")["items"][0]["const_id"] == "tt9999999"  # sorted newest-rated first
 
 
+def test_imdb_ratings_that_load_late():
+    """The live page fills in your rating and 'Rated on' date after first paint."""
+    titles = [("tt7000001", "Late Film", 2026, "Movie", 6.4, 6, "2026-11-08"),
+              ("tt7000002", "Late Show", 2025, "TV Series", 8.0, 9, "2026-11-08")]
+    base = serve({"late.html": fx.imdb_page(titles, late_ratings=True)})
+    imdb.run(full=True, url=f"{base}/late.html")
+    by = {r["const_id"]: r for r in load("imdb_ratings")["items"]}
+    assert by["tt7000001"]["user_rating"] == 6 and by["tt7000001"]["date_rated"] == "2026-11-08"
+    assert by["tt7000002"]["user_rating"] == 9 and by["tt7000002"]["date_rated"] == "2026-11-08"
+
+
 def test_untappd_full_incremental_and_cap():
     base = serve({
         "profile.html": fx.untappd_profile(),

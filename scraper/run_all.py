@@ -32,6 +32,11 @@ def main() -> int:
     ap.add_argument("--headful", action="store_true")
     a = ap.parse_args()
 
+    configured = [n for n in SERVICES if "YOUR_" not in json.dumps(TARGETS.get(n, {}))]
+    if not configured:
+        log("Nothing set up yet: put your IMDb user ID and/or Untappd username in targets.json")
+        return 0
+
     status_path = DATA_ROOT / "backups" / "status.json"
     status = json.loads(status_path.read_text()) if status_path.exists() else {}
     normalize_exports.main()

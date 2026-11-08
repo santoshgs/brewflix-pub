@@ -252,6 +252,11 @@ trimming, flavour parsing, metadata stripping and the image backup.
 - **Scheduled runs stopped:** GitHub pauses scheduled workflows in public
   repos after 60 days without activity. Re-enable *Daily backup* in Actions.
 
+## Changelog
+
+Every change is listed in [`CHANGELOG.md`](CHANGELOG.md), one entry per
+commit.
+
 ## Notes
 
 - This scrapes your own public pages for personal backup. Keep the daily

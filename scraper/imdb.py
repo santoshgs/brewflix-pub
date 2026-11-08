@@ -14,6 +14,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import os
 import json
 import re
 import time
@@ -64,6 +65,37 @@ def _date_from(d: dict):
     return None
 
 
+def _director_names(o: dict) -> list[str]:
+    """Director names from a title node, in the shapes IMDb's JSON uses."""
+    out: list[str] = []
+
+    def names_in(x):
+        if isinstance(x, dict):
+            nt = x.get("nameText")
+            if isinstance(nt, dict) and nt.get("text"):
+                out.append(nt["text"])
+            for v in x.values():
+                names_in(v)
+        elif isinstance(x, list):
+            for v in x:
+                names_in(v)
+
+    names_in(o.get("directors"))
+    for group in o.get("principalCredits") or o.get("principalCreditsV2") or []:
+        if not isinstance(group, dict):
+            continue
+        cat = group.get("category") or group.get("grouping") or {}
+        label = str(cat.get("id") or cat.get("text") or "").lower() if isinstance(cat, dict) else str(cat).lower()
+        if label.startswith("director"):
+            names_in(group.get("credits"))
+    seen, uniq = set(), []
+    for n in out:
+        if n not in seen:
+            seen.add(n)
+            uniq.append(n)
+    return uniq
+
+
 def parse_json_titles(blob) -> dict[str, dict]:
     """Walk any IMDb JSON payload and return {const_id: record}."""
     out: dict[str, dict] = {}
@@ -85,6 +117,12 @@ def parse_json_titles(blob) -> dict[str, dict]:
                     names = [(g.get("genre") or {}).get("text") for g in tg["genres"] if isinstance(g, dict)]
                     if any(names):
                         rec["genres"] = ", ".join(n for n in names if n)
+                rt = o.get("runtime")
+                if isinstance(rt, dict) and isinstance(rt.get("seconds"), (int, float)):
+                    rec["runtime_mins"] = round(rt["seconds"] / 60)
+                names = _director_names(o)
+                if names:
+                    rec["directors"] = ", ".join(names)
                 pi = o.get("primaryImage")
                 if isinstance(pi, dict) and pi.get("url"):
                     rec["poster_url"] = pi["url"]
@@ -208,6 +246,69 @@ def backfill_posters(store: Store, limit: int = 2000, delay: float = 0.25) -> in
     return done
 
 
+# ---------- director + runtime for titles that don't have them ----------
+
+DETAILS_VERSION = 1
+ISO_DUR = re.compile(r"PT(?:(\d+)H)?(?:(\d+)M)?")
+
+
+def parse_ld_json(html: str) -> dict:
+    """Directors and runtime from a title page's schema.org JSON-LD block."""
+    soup = BeautifulSoup(html, "lxml")
+    tag = soup.find("script", type="application/ld+json")
+    if not tag or not tag.string:
+        return {}
+    try:
+        data = json.loads(tag.string)
+    except ValueError:
+        return {}
+    out = {}
+    d = data.get("director")
+    people = d if isinstance(d, list) else [d] if d else []
+    names = [p.get("name") for p in people if isinstance(p, dict) and p.get("name")]
+    if names:
+        out["directors"] = ", ".join(names)
+    m = ISO_DUR.fullmatch(str(data.get("duration") or ""))
+    if m and (m.group(1) or m.group(2)):
+        out["runtime_mins"] = int(m.group(1) or 0) * 60 + int(m.group(2) or 0)
+    return out
+
+
+def fetch_title_details(tid: str) -> dict:
+    import urllib.request
+
+    from common import DESKTOP_UA
+
+    req = urllib.request.Request(f"https://www.imdb.com/title/{tid}/",
+                                 headers={"User-Agent": DESKTOP_UA, "Accept-Language": "en-US,en;q=0.9"})
+    with urllib.request.urlopen(req, timeout=20) as r:
+        return parse_ld_json(r.read().decode("utf-8", "replace"))
+
+
+def backfill_details(store: Store, limit: int | None = None, delay: float = 1.0) -> int:
+    """Fill director and runtime for titles missing either (each title tried once)."""
+    if limit is None:
+        limit = int(os.environ.get("IMDB_DETAILS_PER_RUN", "60"))
+    todo = [r for r in store.rows()
+            if (not r.get("directors") or not r.get("runtime_mins")) and r.get("details_v") != DETAILS_VERSION][:limit]
+    filled = 0
+    for rec in todo:
+        try:
+            got = fetch_title_details(rec["const_id"])
+        except Exception as e:
+            log(f"IMDb details: {rec['const_id']} failed ({e}); will retry next run")
+            continue
+        for f, v in got.items():
+            if not rec.get(f):
+                rec[f] = v
+        rec["details_v"] = DETAILS_VERSION  # series often have no director: don't retry daily
+        filled += bool(got)
+        time.sleep(delay)
+    if todo:
+        log(f"IMDb details: checked {len(todo)} titles, filled {filled}")
+    return filled
+
+
 # ---------- runner ----------
 
 def run(full: bool = False, headful: bool = False, url: str | None = None, max_pages: int = 500) -> int:
@@ -270,6 +371,7 @@ def run(full: bool = False, headful: bool = False, url: str | None = None, max_p
         browser.close()
 
     backfill_posters(store)
+    backfill_details(store)
     store.save()
     log(f"IMDb: done — {len(store)} titles total, {len(store) - start} new")
     return len(store) - start

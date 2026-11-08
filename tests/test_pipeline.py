@@ -16,6 +16,7 @@ TMP = Path(tempfile.mkdtemp(prefix="backup-test-"))
 os.environ["BACKUP_ROOT"] = str(TMP)
 os.environ.setdefault("BACKUP_TZ", "America/Toronto")  # example zone the date tests are written for
 os.environ["UNTAPPD_STATE_FILE"] = str(TMP / "none.json")
+os.environ["IMDB_DETAILS_PER_RUN"] = "0"  # don't reach the live site from tests
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scraper"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
@@ -211,6 +212,37 @@ def test_labels_backed_up_once_per_image():
     assert beers["1"]["label_backup"] == key and not beers["2"].get("label_backup")
     up.clear()
     assert photos.backup_labels(put=lambda k, d: up.__setitem__(k, d), delay=0) == 0 and up == {}
+
+
+def test_imdb_director_and_runtime():
+    from common import Store
+
+    # JSON page data, both shapes IMDb uses
+    blob = {"t": {"id": "tt0000001", "titleText": {"text": "A"}, "runtime": {"seconds": 5880},
+                  "directors": [{"credits": [{"name": {"nameText": {"text": "Jane Doe"}}}]}]},
+            "u": {"id": "tt0000002", "titleText": {"text": "B"},
+                  "principalCredits": [{"category": {"id": "director"}, "credits": [
+                      {"name": {"nameText": {"text": "Ann Lee"}}}, {"name": {"nameText": {"text": "Bo Kim"}}}]},
+                      {"category": {"id": "cast"}, "credits": [{"name": {"nameText": {"text": "Actor"}}}]}]}}
+    got = imdb.parse_json_titles(blob)
+    assert got["tt0000001"]["runtime_mins"] == 98 and got["tt0000001"]["directors"] == "Jane Doe"
+    assert got["tt0000002"]["directors"] == "Ann Lee, Bo Kim"
+
+    page = '<script type="application/ld+json">{"director":[{"@type":"Person","name":"Mark Vanselow"}],"duration":"PT1H38M"}</script>'
+    assert imdb.parse_ld_json(page) == {"directors": "Mark Vanselow", "runtime_mins": 98}
+    assert imdb.parse_ld_json('<script type="application/ld+json">{"duration":"PT45M"}</script>') == {"runtime_mins": 45}
+
+    st = Store("backups/details_test", "const_id", ["const_id"])
+    st.records = {"tt1": {"const_id": "tt1", "date_rated": "2026-01-02"},
+                  "tt2": {"const_id": "tt2", "date_rated": "2026-01-01", "directors": "X", "runtime_mins": 90}}
+    calls, real = [], imdb.fetch_title_details
+    imdb.fetch_title_details = lambda t: calls.append(t) or {"directors": "Jane Doe", "runtime_mins": 101}
+    try:
+        assert imdb.backfill_details(st, limit=10, delay=0) == 1 and calls == ["tt1"]
+        assert imdb.backfill_details(st, limit=10, delay=0) == 0 and calls == ["tt1"]  # not retried
+    finally:
+        imdb.fetch_title_details = real
+    assert st.records["tt1"]["directors"] == "Jane Doe" and st.records["tt1"]["runtime_mins"] == 101
 
 
 def test_native_exports_are_normalized():

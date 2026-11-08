@@ -14,9 +14,9 @@ paywall or disappear, your history is still yours.
 ## What you get
 
 **IMDb**
-- Every title you've rated, with poster, year, type, your rating, IMDb's
-  rating and the date you rated it. Genres, runtime and directors come along
-  if you import IMDb's own export once.
+- Every title you've rated, with poster, year, type, director, runtime, your
+  rating, IMDb's rating and the date you rated it. Search finds directors too.
+  Genres come along if you import IMDb's own export once.
 - An **Insights** card: a 1–10 breakdown of your ratings (with a table view)
   and your genres, most rated or top rated. Tap a genre to filter the list.
 
@@ -38,6 +38,7 @@ paywall or disappear, your history is still yours.
 ![Unique beers with style, ABV, IBU and ratings](docs/screenshots/unique-beers.png)
 
 **Everywhere**
+- Links to your IMDb and Untappd profiles at the top of the page.
 - Search any tab; the stats cards follow your search (type "IPA" for IPA stats).
 - Download any list as CSV or JSON.
 - Works on a phone: extra columns fold into the line under each title.
@@ -212,6 +213,7 @@ git fetch origin main && git show FETCH_HEAD:scripts/codespace_resync.sh | bash
 | Setting | Where | Default |
 |---|---|---|
 | `BACKUP_TZ` | env / repo variable | `UTC`: day used for check-in dates |
+| `IMDB_DETAILS_PER_RUN` | env | `60` titles looked up per run for missing director/runtime |
 | `UNTAPPD_DETAILS_PER_RUN` | env | `120` check-in pages read per run for flavour tags |
 | `PHOTOS_PER_RUN` / `LABELS_PER_RUN` | env | `600` / `1000` images copied per run |
 | `R2_*` secrets, `R2_BUCKET` variable | GitHub | image backup off when missing |

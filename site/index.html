@@ -21,6 +21,13 @@ body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 ui-sans-serif
 .wrap{max-width:1100px;margin:0 auto;padding:24px 16px 64px}
 header h1{font:700 28px/1.1 Georgia,"Iowan Old Style",serif;margin:0 0 4px;letter-spacing:-.01em}
 header p{margin:0;color:var(--muted)}
+header{display:flex;justify-content:space-between;align-items:flex-start;gap:12px 16px;flex-wrap:wrap}
+header .intro{min-width:0;flex:1 1 280px}
+.profiles{display:flex;gap:8px;flex-wrap:wrap}
+.profiles a{display:inline-flex;align-items:center;gap:7px;padding:6px 11px;border:1px solid var(--line);border-radius:99px;background:var(--panel);color:var(--ink);text-decoration:none;font-size:13px;font-weight:600}
+.profiles a:hover{border-color:var(--muted)}
+.profiles a:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+.profiles img{width:16px;height:16px;border-radius:3px;display:block}
 .status{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0 20px}
 .pill{background:var(--chip);border-radius:99px;padding:4px 10px;font-size:13px;color:var(--muted)}
 .pill b{color:var(--ink);font-weight:600}
@@ -119,8 +126,11 @@ table.mini th{position:static;cursor:default}
 <body>
 <div class="wrap">
   <header>
-    <h1>Brewflix</h1>
-    <p>Personal backup of IMDb ratings and Untappd check-ins, refreshed daily.</p>
+    <div class="intro">
+      <h1>Brewflix</h1>
+      <p>Personal backup of IMDb ratings and Untappd check-ins, refreshed daily.</p>
+    </div>
+    <nav class="profiles" id="profiles" aria-label="Profiles" hidden></nav>
   </header>
   <div class="status" id="status"></div>
   <nav class="tabs" role="tablist" id="tabs"></nav>
@@ -132,7 +142,8 @@ const VIEWS = {
     label: "IMDb ratings", file: "imdb_ratings", accent: "--imdb", sort: "date_rated", stats: "imdb",
     cols: [
       ["title", "Title", r => withThumb(poster(r.poster_url), "poster",
-        `<a href="${r.url}" target="_blank" rel="noopener">${esc(r.title)}</a><div class="sub">${[r.year, r.title_type].filter(Boolean).map(esc).join(" · ")}</div>`)],
+        `<a href="${r.url}" target="_blank" rel="noopener">${esc(r.title)}</a><div class="sub">${[r.year, r.title_type].filter(Boolean).map(esc).join(" · ")}</div>`
+        + credits(r))],
       ["year", "Year", r => r.year ?? "", "num hide-sm"],
       ["user_rating", "Mine", r => r.user_rating != null ? `<span class="mine">${r.user_rating}</span>` : "", "num"],
       ["imdb_rating", "IMDb", r => r.imdb_rating != null ? `<span class="comm">${(+r.imdb_rating).toFixed(1)}</span>` : "", "num"],
@@ -188,6 +199,9 @@ const VIEWS = {
   },
 };
 const PAGE = 100;
+// third line under an IMDb title: "Director · 98 min"
+const credits = r => { const t = [r.directors, r.runtime_mins ? `${Math.round(+r.runtime_mins)} min` : ""].filter(Boolean).map(esc).join(" · ");
+  return t ? `<div class="sub">${t}</div>` : ""; };
 // IMDb images resize via the URL: ask for a ~92px-wide copy instead of the full poster
 const poster = u => u ? u.replace(/\._V1_[^/]*\.(jpg|png)$/i, "._V1_QL75_UX92_.$1") : u;
 const withThumb = (src, kind, inner, photo) => { const t = typeof src === "object" && src ? src : { src, alt: "" };
@@ -240,6 +254,12 @@ async function init() {
       : `<span class="pill bad" title="${esc(s.last_error)}">${name}: <b>last run failed</b> · good copy from ${ago(s.last_success)}</span>`);
   }
   if (!pills.length) pills.push(`<span class="pill">No sync status yet</span>`);
+  // links to your own profiles (from targets.json via status.json); icons are each site's own favicon
+  const prof = status?.profiles || {};
+  const links = [["imdb", "IMDb", "https://www.imdb.com/favicon.ico"], ["untappd", "Untappd", "https://untappd.com/favicon.ico"]]
+    .filter(([k]) => /^https:\/\/(www\.)?(imdb|untappd)\.com\//.test(prof[k] || ""))
+    .map(([k, label, icon]) => `<a href="${esc(prof[k])}" target="_blank" rel="noopener noreferrer"><img src="${icon}" alt="" width="16" height="16" onerror="this.remove()">${label}</a>`);
+  if (links.length) { $("#profiles").innerHTML = links.join(""); $("#profiles").hidden = false; }
   $("#status").innerHTML = pills.join("");
   $("#tabs").innerHTML = Object.entries(VIEWS).map(([k, v]) =>
     `<button role="tab" data-k="${k}" aria-selected="${k === state.tab}">${v.label} <span class="count">${state.data[k].length}</span></button>`).join("");

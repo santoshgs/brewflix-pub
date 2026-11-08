@@ -66,6 +66,16 @@ def main() -> int:
             failed.append("photos")
             status.setdefault("photos", {}).update({"ok": False, "last_attempt": now_iso(), "last_error": str(e)[:300]})
 
+    # profile links for the site header (skipped while targets.json has placeholders)
+    profiles = {}
+    imdb_id = TARGETS.get("imdb", {}).get("user_id", "")
+    if imdb_id and "YOUR_" not in imdb_id:
+        profiles["imdb"] = f"https://www.imdb.com/user/{imdb_id}/"
+    up = TARGETS.get("untappd", {}).get("profile_url", "")
+    if up and "YOUR_" not in up:
+        profiles["untappd"] = up
+    status["profiles"] = profiles
+
     status["generated_at"] = now_iso()
     status_path.parent.mkdir(exist_ok=True)
     status_path.write_text(json.dumps(status, indent=2))

@@ -1,0 +1,20 @@
+{
+  // Cloud dev box for the one-time Untappd login + history backfill.
+  // Includes a small Linux desktop you open in your browser (port 6080),
+  // so the Untappd login window can be used from a phone or tablet.
+  "name": "Brewflix",
+  "image": "mcr.microsoft.com/devcontainers/python:3.12",
+  "features": {
+    "ghcr.io/devcontainers/features/desktop-lite:1": {}
+  },
+  "runArgs": ["--shm-size=1g"],
+  "remoteUser": "vscode",
+  "forwardPorts": [6080],
+  "portsAttributes": {
+    "6080": { "label": "Browser desktop", "onAutoForward": "openBrowser" },
+    "5901": { "label": "VNC (not needed)", "onAutoForward": "ignore" }
+  },
+  // 24-bit colour: Chromium draws a blank white window at the default 16-bit depth
+  "containerEnv": { "DISPLAY": ":1", "VNC_RESOLUTION": "1280x800x24", "VNC_DPI": "96" },
+  "postCreateCommand": "pip install -r requirements.txt && python -m playwright install --with-deps chromium"
+}

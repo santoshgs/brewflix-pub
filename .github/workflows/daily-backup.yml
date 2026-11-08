@@ -1,0 +1,74 @@
+name: Daily backup
+
+on:
+  schedule:
+    - cron: "17 10 * * *"   # every day at 10:17 UTC; change to suit
+  workflow_dispatch:
+    inputs:
+      full:
+        description: "Re-walk the full history instead of only new items"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: backup
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          python -m playwright install --with-deps chromium
+
+      - name: Restore Untappd session (optional)
+        env:
+          UNTAPPD_STORAGE_STATE: ${{ secrets.UNTAPPD_STORAGE_STATE }}
+        if: env.UNTAPPD_STORAGE_STATE != ''
+        run: |
+          mkdir -p .secrets
+          echo "$UNTAPPD_STORAGE_STATE" | base64 -d > .secrets/untappd_state.json
+
+      - name: Back up IMDb + Untappd
+        id: scrape
+        continue-on-error: true
+        env:
+          # optional: private photo backup to Cloudflare R2 (skipped if unset)
+          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_BUCKET: ${{ vars.R2_BUCKET }}
+          BACKUP_TZ: ${{ vars.BACKUP_TZ }}
+        run: python scraper/run_all.py ${{ inputs.full && '--full' || '' }}
+
+      # Cloudflare Workers Builds redeploys the site on every push to main.
+      - name: Commit new data
+        run: |
+          git config user.name  "backup-bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add backups/
+          if git diff --cached --quiet; then
+            echo "No changes."
+          else
+            git commit -m "backup: $(date -u +%F)"
+            git push
+          fi
+
+      - name: Mark run failed if a scrape failed
+        if: steps.scrape.outcome == 'failure'
+        run: |
+          echo "::error::A scraper failed — see backups/status.json. Data from the other service was still saved."
+          exit 1

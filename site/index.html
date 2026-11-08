@@ -1,0 +1,487 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Brewflix</title>
+<style>
+:root{
+  --bg:#f6f4ef;--panel:#fffdf8;--ink:#1d1b16;--muted:#6d675c;--line:#e3ded2;
+  --imdb:#c99a06;--beer:#b4560f;--ok:#2f7d4f;--bad:#b3261e;--chip:#efe9dc;
+  --on-imdb:#1d1b16;--on-beer:#fffdf8;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#15140f;--panel:#1d1c16;--ink:#ece7da;--muted:#a39d8f;--line:#33312a;
+  --imdb:#f2c230;--beer:#f08a3c;--ok:#6cc790;--bad:#ff8a80;--chip:#2a2821;--on-imdb:#15140f;--on-beer:#15140f;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#15140f;--panel:#1d1c16;--ink:#ece7da;--muted:#a39d8f;--line:#33312a;
+  --imdb:#f2c230;--beer:#f08a3c;--ok:#6cc790;--bad:#ff8a80;--chip:#2a2821;--on-imdb:#15140f;--on-beer:#15140f;color-scheme:dark}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif}
+.wrap{max-width:1100px;margin:0 auto;padding:24px 16px 64px}
+header h1{font:700 28px/1.1 Georgia,"Iowan Old Style",serif;margin:0 0 4px;letter-spacing:-.01em}
+header p{margin:0;color:var(--muted)}
+.status{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0 20px}
+.pill{background:var(--chip);border-radius:99px;padding:4px 10px;font-size:13px;color:var(--muted)}
+.pill b{color:var(--ink);font-weight:600}
+.pill.bad b{color:var(--bad)} .pill.ok b{color:var(--ok)}
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin-bottom:16px;overflow-x:auto}
+.tabs button{all:unset;cursor:pointer;padding:10px 14px;border-bottom:3px solid transparent;color:var(--muted);white-space:nowrap;font-weight:600}
+.tabs button[aria-selected=true]{color:var(--ink);border-color:var(--accent,var(--imdb))}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:16px}
+.tile{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 14px}
+.tile .n{font:700 24px/1 Georgia,serif;font-variant-numeric:tabular-nums}
+.tile .l{color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.06em;margin-top:6px}
+.bar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px}
+.bar input{flex:1 1 220px;min-width:0;padding:9px 12px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink);font:inherit}
+.bar a{color:var(--ink);text-decoration:none;border:1px solid var(--line);border-radius:8px;padding:8px 12px;background:var(--panel);font-size:13px}
+.bar a:hover{border-color:var(--accent)}
+.count{color:var(--muted);font-size:13px}
+.tbl{background:var(--panel);border:1px solid var(--line);border-radius:10px;overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+th{position:sticky;top:0;background:var(--panel);cursor:pointer;user-select:none;font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);white-space:nowrap}
+th[data-dir]::after{content:attr(data-dir);margin-left:4px;color:var(--accent)}
+td.num{font-variant-numeric:tabular-nums;white-space:nowrap}
+td a{color:inherit}
+.mine{font-weight:700;color:var(--accent)}
+.sub{color:var(--muted);font-size:12px}
+.cell{display:flex;gap:10px;align-items:flex-start;min-width:0}
+.cell .txt{min-width:0}
+.thumb{flex:none;display:block;background:var(--chip);overflow:hidden}
+.thumb img{display:block;width:100%;height:100%;object-fit:cover}
+.thumb.poster{width:40px;height:60px;border-radius:4px}
+.thumb.label{width:44px;height:44px;border-radius:50%}
+.comm{color:var(--muted);font-weight:600}
+@media (max-width:640px){th,td{padding:8px 6px} .thumb.poster{width:34px;height:51px} .thumb.label{width:36px;height:36px}}
+.more{display:block;margin:12px auto 0;padding:8px 16px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink);font:inherit;cursor:pointer}
+.empty{padding:32px;text-align:center;color:var(--muted)}
+/* flavours + photo on check-ins */
+.flav{display:flex;flex-wrap:wrap;gap:4px;margin-top:5px}
+.flav span{font-size:11px;line-height:1;padding:4px 7px;border-radius:99px;background:var(--chip);color:var(--muted)}
+.cell .txt{flex:1}
+.photo{flex:none;width:48px;height:48px;border-radius:6px;overflow:hidden;padding:0;border:0;background:var(--chip);cursor:zoom-in}
+.photo img{display:block;width:100%;height:100%;object-fit:cover}
+.lightbox{position:fixed;inset:0;z-index:50;background:rgba(10,9,6,.86);display:flex;align-items:center;justify-content:center;
+  padding:max(16px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) max(16px,env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left));cursor:zoom-out}
+.lightbox img{max-width:100%;max-height:100%;border-radius:8px}
+/* drink statistics */
+.stats{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px;margin-bottom:12px}
+.stats h2{font:700 17px/1.2 Georgia,serif;margin:0 0 2px}
+.stats .note{color:var(--muted);font-size:12px;margin:0 0 10px}
+.stats h2 .disc{all:unset;box-sizing:border-box;display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;cursor:pointer;border-radius:6px}
+.stats h2 .disc:focus-visible{outline:2px solid var(--accent);outline-offset:4px}
+.stats h2 .disc .chev{font:400 18px/1 ui-sans-serif,system-ui,sans-serif;color:var(--muted);transition:transform .15s}
+.stats h2 .disc[aria-expanded=true] .chev{transform:rotate(180deg)}
+.stats.closed .note{margin-bottom:0}
+@media (prefers-reduced-motion:reduce){.stats h2 .disc .chev{transition:none}}
+.seg{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;margin-bottom:8px;scrollbar-width:none}
+.seg button{flex:none;font-weight:600;font-size:13px;line-height:1;font-family:inherit;padding:7px 11px;border-radius:99px;border:1px solid var(--line);background:transparent;color:var(--muted);cursor:pointer}
+.seg button[aria-pressed=true]{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+.seg button:focus-visible,.photo:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.rank{list-style:none;margin:0;padding:0;display:grid;gap:7px}
+.rank li{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px 10px;align-items:baseline;font-size:14px}
+.rank .nm{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rank .nm small{color:var(--muted);font-size:12px;margin-left:4px}
+.rank .v{font-variant-numeric:tabular-nums;font-weight:700}
+.rank .trk{grid-column:1/-1;height:6px;border-radius:99px;background:var(--chip);overflow:hidden}
+.rank .trk i{display:block;height:100%;border-radius:99px;background:var(--accent)}
+.hist{position:relative;margin-top:14px;border-top:1px solid var(--line);padding-top:12px}
+.hist h3{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:0 0 6px;font-weight:600}
+.hist svg{display:block;width:100%;height:auto;overflow:visible}
+.hist .tip{position:absolute;pointer-events:none;background:var(--ink);color:var(--bg);font-size:12px;padding:5px 8px;border-radius:6px;white-space:nowrap;transform:translate(-50%,-110%)}
+.sm-only{display:none}
+/* IMDb insights */
+.ins-head{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.ins-head h3{font-size:15px;margin:0}
+.bars{position:relative;margin:4px 0 2px}
+.bars svg{display:block;width:100%;height:auto}
+.bars .tip{position:absolute;pointer-events:none;background:var(--ink);color:var(--bg);font-size:12px;padding:5px 8px;border-radius:6px;white-space:nowrap;transform:translate(-50%,-115%)}
+.toggle{display:inline-flex;align-items:center;gap:8px;border:0;background:none;color:var(--ink);font:inherit;font-size:13px;cursor:pointer;padding:4px}
+.toggle .sw{width:34px;height:20px;border-radius:99px;background:var(--line);position:relative;transition:background .15s}
+.toggle .sw::after{content:"";position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:var(--panel);box-shadow:0 1px 2px rgba(0,0,0,.25);transition:transform .15s}
+.toggle[aria-pressed=true] .sw{background:var(--accent)}
+.toggle[aria-pressed=true] .sw::after{transform:translateX(14px)}
+.toggle:focus-visible,.genres button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+table.mini{width:100%;font-size:13px}
+table.mini th,table.mini td{padding:5px 8px;font-variant-numeric:tabular-nums}
+table.mini th{position:static;cursor:default}
+.genres{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.genres button{all:unset;box-sizing:border-box;width:100%;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 12px;border-radius:10px;background:var(--chip);cursor:pointer}
+.genres b{display:block;font-size:15px}
+.genres small{color:var(--muted);font-size:13px}
+.genres .star{color:var(--accent)}
+.genres .chev{color:var(--muted);font-size:20px;line-height:1}
+@media (prefers-reduced-motion:reduce){.toggle .sw,.toggle .sw::after{transition:none}}
+@media (max-width:640px){.hide-sm{display:none} .sm-only{display:block}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Brewflix</h1>
+    <p>Personal backup of IMDb ratings and Untappd check-ins, refreshed daily.</p>
+  </header>
+  <div class="status" id="status"></div>
+  <nav class="tabs" role="tablist" id="tabs"></nav>
+  <section id="view"></section>
+</div>
+<script>
+const VIEWS = {
+  imdb: {
+    label: "IMDb ratings", file: "imdb_ratings", accent: "--imdb", sort: "date_rated", stats: "imdb",
+    cols: [
+      ["title", "Title", r => withThumb(poster(r.poster_url), "poster",
+        `<a href="${r.url}" target="_blank" rel="noopener">${esc(r.title)}</a><div class="sub">${[r.year, r.title_type].filter(Boolean).map(esc).join(" · ")}</div>`)],
+      ["year", "Year", r => r.year ?? "", "num hide-sm"],
+      ["user_rating", "Mine", r => r.user_rating != null ? `<span class="mine">${r.user_rating}</span>` : "", "num"],
+      ["imdb_rating", "IMDb", r => r.imdb_rating != null ? `<span class="comm">${(+r.imdb_rating).toFixed(1)}</span>` : "", "num"],
+      ["date_rated", "Rated", r => shortDate(r.date_rated), "num"],
+    ],
+    tiles: d => [
+      [d.length, "titles rated"],
+      [avg(d, "user_rating"), "my average"],
+      [avg(d, "imdb_rating"), "IMDb average"],
+      [d.filter(r => (r.date_rated || "").startsWith(String(new Date().getFullYear()))).length, "rated this year"],
+    ],
+  },
+  checkins: {
+    label: "Untappd check-ins", file: "untappd_checkins", accent: "--beer", sort: "checkin_date", stats: "drink",
+    cols: [
+      ["beer_name", "Beer", r => withThumb(labelOf(r), "label",
+        `<a href="${r.checkin_url || "#"}" target="_blank" rel="noopener">${esc(r.beer_name)}</a><div class="sub">${esc(r.brewery_name || "")}${r.style ? " · " + esc(r.style) : ""}</div>`
+        + `<div class="sub sm-only">${[shortDay(r.checkin_date), r.serving_type, strength(r)].filter(Boolean).map(esc).join(" · ")}</div>`
+        + (r.comment ? `<div class="sub">“${esc(r.comment)}”</div>` : "")
+        + (r.flavors ? `<div class="flav">${r.flavors.split(/,\s*/).map(f => `<span>${esc(f)}</span>`).join("")}</div>` : ""),
+        photoOf(r))],
+      ["user_rating", "Mine", r => r.user_rating != null ? `<span class="mine">${r.user_rating}</span>` : "", "num"],
+      ["global_rating", "Global", r => r.global_rating != null ? `<span class="comm">${(+r.global_rating).toFixed(2)}</span>` : "", "num"],
+      ["abv", "ABV", r => r.abv != null ? r.abv + "%" : "", "num hide-sm"],
+      ["ibu", "IBU", r => r.ibu != null ? Math.round(r.ibu) : "", "num hide-sm"],
+      ["checkin_date", "When", r => shortDate(r.checkin_date), "num hide-sm"],
+    ],
+    tiles: d => [
+      [d.length, "check-ins"],
+      [new Set(d.map(r => r.beer_id || r.beer_name)).size, "distinct beers"],
+      [new Set(d.map(r => r.brewery_name)).size, "breweries"],
+      [avg(d, "user_rating", 2), "my average"],
+    ],
+  },
+  beers: {
+    label: "Unique beers", file: "untappd_beers", accent: "--beer", sort: "last_checkin",
+    cols: [
+      ["beer_name", "Beer", r => withThumb(labelOf(r), "label",
+        `<a href="${r.beer_url || "#"}" target="_blank" rel="noopener">${esc(r.beer_name)}</a><div class="sub">${esc(r.brewery_name || "")}</div><div class="sub sm-only">${[r.style, strength(r)].filter(Boolean).map(esc).join(" · ")}</div>`)],
+      ["style", "Style", r => esc(r.style || ""), "hide-sm"],
+      ["abv", "ABV", r => r.abv != null ? r.abv + "%" : "", "num hide-sm"],
+      ["ibu", "IBU", r => r.ibu != null ? Math.round(r.ibu) : "", "num hide-sm"],
+      ["user_rating", "Mine", r => r.user_rating ? `<span class="mine">${r.user_rating}</span>` : "", "num"],
+      ["global_rating", "Global", r => r.global_rating != null ? `<span class="comm">${(+r.global_rating).toFixed(2)}</span>` : "", "num"],
+      ["checkin_count", "Times", r => r.checkin_count ?? "", "num hide-sm"],
+    ],
+    tiles: d => [
+      [d.length, "unique beers"],
+      [avg(d, "abv", 1) + (d.length ? "%" : ""), "average ABV"],
+      [topBy(d, "style"), "top style"],
+      [topBy(d, "brewery_name"), "top brewery"],
+    ],
+  },
+};
+const PAGE = 100;
+// IMDb images resize via the URL: ask for a ~92px-wide copy instead of the full poster
+const poster = u => u ? u.replace(/\._V1_[^/]*\.(jpg|png)$/i, "._V1_QL75_UX92_.$1") : u;
+const withThumb = (src, kind, inner, photo) => { const t = typeof src === "object" && src ? src : { src, alt: "" };
+  return `<div class="cell"><span class="thumb ${kind}">${t.src ? `<img src="${esc(t.src)}" data-alt="${esc(t.alt || "")}" alt="" loading="lazy" decoding="async" onerror="imgFallback(this)">` : ""}</span><div class="txt">${inner}</div>${photo
+  ? `<button class="photo" data-full="${esc(photo.full)}" data-full-alt="${esc(photo.fullAlt || "")}" aria-label="View check-in photo"><img src="${esc(photo.thumb)}" data-alt="${esc(photo.thumbAlt || "")}" alt="" loading="lazy" decoding="async" onerror="imgFallback(this)"></button>` : ""}</div>`; };
+// Beer label / brewery logo: your private copy first, Untappd's as fallback.
+const labelOf = r => r.label_backup ? { src: r.label_backup, alt: r.label_url || "" } : { src: r.label_url, alt: "" };
+// Your own photo copy (private R2, behind Cloudflare Access) first; Untappd's as fallback.
+const photoOf = r => {
+  if (!r.photo_url && !r.photo_backup) return null;
+  const remote = r.photo_url || "", remoteThumb = remote.replace(/width=\d+&height=\d+/, "width=160&height=160");
+  return r.photo_backup
+    ? { thumb: `thumbs/${r.checkin_id}.webp`, thumbAlt: remoteThumb, full: `photos/${r.checkin_id}.webp`, fullAlt: remote }
+    : { thumb: remoteThumb, full: remote };
+};
+function imgFallback(img) {
+  const alt = img.dataset.alt;
+  if (alt) { img.dataset.alt = ""; img.src = alt; }
+  else if (img.closest(".photo")) img.closest(".photo").remove();
+  else img.remove();
+}
+const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+// "6.5% · 45 IBU" for the phone sub-line (ABV and IBU columns are desktop-only)
+const strength = r => [r.abv != null ? `${r.abv}%` : "", r.ibu != null ? `${Math.round(r.ibu)} IBU` : ""].filter(Boolean).join(" · ");
+const shortDay = iso => { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso || ""); return m ? `${+m[3]} ${MONTHS[m[2] - 1]} ${m[1]}` : ""; };
+const shortDate = iso => { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso || ""); return m ? `${+m[3]} ${MONTHS[m[2] - 1]}<div class="sub">${m[1]}</div>` : ""; };
+const state = { tab: "imdb", q: "", sort: null, dir: -1, shown: PAGE, data: {} };
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const avg = (d, k, p = 1) => { const v = d.map(r => +r[k]).filter(x => x > 0); return v.length ? (v.reduce((a, b) => a + b, 0) / v.length).toFixed(p) : "–"; };
+const topBy = (d, k) => { const c = {}; d.forEach(r => r[k] && (c[r[k]] = (c[r[k]] || 0) + 1)); const t = Object.entries(c).sort((a, b) => b[1] - a[1])[0]; return t ? `<span style="font-size:15px">${esc(t[0])}</span>` : "–"; };
+const ago = iso => { if (!iso) return "never"; const h = (Date.now() - new Date(iso)) / 36e5; return h < 1 ? "just now" : h < 48 ? Math.round(h) + "h ago" : Math.round(h / 24) + "d ago"; };
+
+async function getJSON(f) {
+  // a missing or non-JSON file just means "no data yet" for that tab
+  try { const r = await fetch(`data/${f}.json`, { cache: "no-cache" });
+    if (!r.ok || !(r.headers.get("content-type") || "").includes("json")) return null;
+    return await r.json(); } catch { return null; }
+}
+
+async function init() {
+  const [status, ...sets] = await Promise.all([getJSON("status"), ...Object.values(VIEWS).map(v => getJSON(v.file))]);
+  Object.keys(VIEWS).forEach((k, i) => state.data[k] = sets[i]?.items || []);
+  const pills = [];
+  for (const [svc, name] of [["imdb", "IMDb"], ["untappd", "Untappd"]]) {
+    const s = status?.[svc];
+    if (!s) continue;
+    pills.push(s.ok
+      ? `<span class="pill ok">${name}: <b>synced ${ago(s.last_success)}</b> · +${s.added_last_run ?? 0} last run</span>`
+      : `<span class="pill bad" title="${esc(s.last_error)}">${name}: <b>last run failed</b> · good copy from ${ago(s.last_success)}</span>`);
+  }
+  if (!pills.length) pills.push(`<span class="pill">No sync status yet</span>`);
+  $("#status").innerHTML = pills.join("");
+  $("#tabs").innerHTML = Object.entries(VIEWS).map(([k, v]) =>
+    `<button role="tab" data-k="${k}" aria-selected="${k === state.tab}">${v.label} <span class="count">${state.data[k].length}</span></button>`).join("");
+  $("#tabs").onclick = e => { const b = e.target.closest("button"); if (b) { Object.assign(state, { tab: b.dataset.k, q: "", sort: null, dir: -1, shown: PAGE }); render(true); } };
+  render(true);
+}
+
+function render(full) {
+  const v = VIEWS[state.tab];
+  document.documentElement.style.setProperty("--accent", `var(${v.accent})`);
+  document.documentElement.style.setProperty("--on-accent", `var(--on-${v.accent.slice(2)})`);
+  document.querySelectorAll("#tabs button").forEach(b => b.setAttribute("aria-selected", b.dataset.k === state.tab));
+  const all = state.data[state.tab];
+  if (full) {
+    $("#view").innerHTML = `
+      <div class="tiles">${v.tiles(all).map(([n, l]) => `<div class="tile"><div class="n">${n}</div><div class="l">${l}</div></div>`).join("")}</div>
+      <div class="bar"><input id="q" type="search" placeholder="Search ${v.label.toLowerCase()}…" aria-label="Search">
+        <span class="count" id="count"></span>
+        <a href="data/${v.file}.csv" download>CSV</a><a href="data/${v.file}.json" download>JSON</a></div>
+      ${v.stats ? `<section class="stats" id="stats" aria-label="${v.stats === "imdb" ? "Insights" : "Drink statistics"}"></section>` : ""}
+      <div class="tbl" id="tbl"></div>`;
+    $("#q").oninput = e => { state.q = e.target.value.toLowerCase(); state.shown = PAGE; render(false); };
+  }
+  const key = state.sort || v.sort;
+  let rows = state.q ? all.filter(r => Object.values(r).some(x => String(x ?? "").toLowerCase().includes(state.q))) : all.slice();
+  rows.sort((a, b) => { const x = a[key], y = b[key]; if (x == null || x === "") return 1; if (y == null || y === "") return -1;
+    return (typeof x === "number" && typeof y === "number" ? x - y : String(x).localeCompare(String(y))) * state.dir; });
+  $("#count").textContent = `${rows.length} of ${all.length}`;
+  if (v.stats === "drink") renderStats(rows, all.length);
+  if (v.stats === "imdb") renderImdbInsights(rows, all.length);
+  if (!all.length) { $("#tbl").innerHTML = `<div class="empty">No data yet — the first backup run will fill this in.</div>`; return; }
+  $("#tbl").innerHTML = `<table><thead><tr>${v.cols.map(([k, l, , c]) =>
+      `<th data-k="${k}" class="${c || ""}" ${k === key ? `data-dir="${state.dir > 0 ? "▲" : "▼"}"` : ""}>${l}</th>`).join("")}</tr></thead>
+    <tbody>${rows.slice(0, state.shown).map(r => `<tr>${v.cols.map(([, , f, c]) => `<td class="${c || ""}">${f(r)}</td>`).join("")}</tr>`).join("")}</tbody></table>
+    ${rows.length > state.shown ? `<button class="more" id="more">Show ${Math.min(PAGE, rows.length - state.shown)} more</button>` : ""}`;
+  $("#tbl thead").onclick = e => { const th = e.target.closest("th"); if (!th) return;
+    if ((state.sort || v.sort) === th.dataset.k) state.dir *= -1; else { state.sort = th.dataset.k; state.dir = -1; } render(false); };
+  const m = $("#more"); if (m) m.onclick = () => { state.shown += PAGE; render(false); };
+}
+// ---------- drink statistics ----------
+const STAT_VIEWS = [
+  ["style", "By style", "rating"], ["producer", "By producer", "rating"], ["serving", "By serving", "rating"],
+  ["style", "Top styles", "count"], ["producer", "Top producers", "count"],
+];
+const groupKey = {
+  style: r => (r.style || "").split(" - ")[0].trim() || null,   // "IPA - New England" -> "IPA"
+  producer: r => r.brewery_name || null,
+  serving: r => r.serving_type || null,
+};
+let statView = 0;
+
+function groups(rows, dim) {
+  const g = new Map();
+  for (const r of rows) {
+    const k = groupKey[dim](r); if (!k) continue;
+    const e = g.get(k) || { n: 0, sum: 0, rated: 0 };
+    e.n++; if (r.user_rating > 0) { e.sum += +r.user_rating; e.rated++; }
+    g.set(k, e);
+  }
+  return [...g].map(([name, e]) => ({ name, n: e.n, avg: e.rated ? e.sum / e.rated : null }));
+}
+
+// Collapsible stats cards (closed by default; remembered while the page is open)
+const statsOpen = { drink: false, imdb: false };
+function cardHead(el, kind, title, note, rerender) {
+  const open = statsOpen[kind];
+  el.classList.toggle("closed", !open);
+  const head = `<h2><button type="button" class="disc" aria-expanded="${open}" aria-controls="stats-body">${title}<span class="chev" aria-hidden="true">▾</span></button></h2><p class="note">${note}</p>`;
+  const bind = () => { el.querySelector(".disc").onclick = () => { statsOpen[kind] = !statsOpen[kind]; rerender(); el.querySelector(".disc").focus(); }; };
+  return { open, head, bind };
+}
+
+function renderStats(rows, total) {
+  const el = $("#stats"); if (!el) return;
+  const [dim, label, mode] = STAT_VIEWS[statView];
+  const scope0 = rows.length === total ? `All ${total} check-ins` : `${rows.length} matching check-ins`;
+  const card = cardHead(el, "drink", "Drink stats", statsOpen.drink ? scope0 + (mode === "rating" && dim !== "serving" ? " · groups with 2+ check-ins" : "") + (dim === "style" ? " · styles grouped by family" : "")
+    : `${scope0} · ratings by style, producer and serving`, () => renderStats(rows, total));
+  if (!card.open) { el.innerHTML = card.head; card.bind(); return; }
+  let list = groups(rows, dim);
+  const minN = dim === "serving" ? 1 : 2;
+  list = mode === "rating"
+    ? list.filter(x => x.avg != null && x.n >= minN).sort((a, b) => b.avg - a.avg || b.n - a.n)
+    : list.sort((a, b) => b.n - a.n || (b.avg || 0) - (a.avg || 0));
+  list = list.slice(0, 8);
+  const maxN = Math.max(1, ...list.map(x => x.n));
+  const items = list.length ? list.map(x => {
+    const pct = mode === "rating" ? x.avg / 5 * 100 : x.n / maxN * 100;
+    const val = mode === "rating" ? x.avg.toFixed(2) : x.n;
+    const sub = mode === "rating" ? `${x.n} check-in${x.n > 1 ? "s" : ""}` : (x.avg != null ? `avg ${x.avg.toFixed(2)}` : "");
+    return `<li><span class="nm">${esc(x.name)}<small>${sub}</small></span><span class="v">${val}</span><span class="trk"><i style="width:${pct.toFixed(1)}%"></i></span></li>`;
+  }).join("") : `<li><span class="nm" style="color:var(--muted)">Not enough check-ins to rank${mode === "rating" && minN > 1 ? " (needs 2+ per group)" : ""}.</span></li>`;
+  el.innerHTML = `${card.head}<div id="stats-body">
+    <div class="seg" role="group" aria-label="Statistic">${STAT_VIEWS.map((s, i) => `<button type="button" data-i="${i}" aria-pressed="${i === statView}">${s[1]}</button>`).join("")}</div>
+    <ol class="rank">${items}</ol>
+    <div class="hist"><h3>Rating distribution</h3><div id="histc"></div></div></div>`;
+  card.bind();
+  el.querySelector(".seg").onclick = e => { const b = e.target.closest("button"); if (b) { statView = +b.dataset.i; renderStats(rows, total); } };
+  drawHistogram($("#histc"), rows);
+}
+
+function drawHistogram(host, rows) {
+  const BINS = 20, STEP = 0.25;                 // 0.25 … 5.00, Untappd's rating scale
+  const counts = Array(BINS).fill(0);
+  let n = 0, sum = 0;
+  for (const r of rows) {
+    const v = +r.user_rating; if (!(v > 0)) continue;
+    const i = Math.min(BINS - 1, Math.max(0, Math.round(v / STEP) - 1));
+    counts[i]++; n++; sum += v;
+  }
+  if (!n) { host.innerHTML = `<p class="note">No ratings in this selection.</p>`; return; }
+  // gaussian-smoothed frequency curve over the bins (same units as the bars)
+  const bw = 1.2;
+  const smooth = counts.map((_, i) => { let s = 0, w = 0; counts.forEach((c, j) => { const k = Math.exp(-((i - j) ** 2) / (2 * bw * bw)); s += c * k; w += k; }); return s / w; });
+  const W = Math.max(280, host.clientWidth || 600), H = 170, m = { l: 30, r: 8, t: 10, b: 24 };
+  const iw = W - m.l - m.r, ih = H - m.t - m.b;
+  const maxY = Math.max(...counts, ...smooth);
+  const nice = maxY <= 5 ? 5 : Math.ceil(maxY / 5) * 5;
+  const x = i => m.l + (i + 0.5) * iw / BINS;
+  const y = c => m.t + ih - c / nice * ih;
+  const bwPx = iw / BINS - 2;
+  // Catmull-Rom → cubic Bézier for a smooth curve through the smoothed points
+  const pts = smooth.map((c, i) => [x(i), y(c)]);
+  let d = `M${pts[0][0]},${pts[0][1]}`;
+  for (let i = 0; i < pts.length - 1; i++) {
+    const p0 = pts[i - 1] || pts[i], p1 = pts[i], p2 = pts[i + 1], p3 = pts[i + 2] || p2;
+    d += ` C${p1[0] + (p2[0] - p0[0]) / 6},${p1[1] + (p2[1] - p0[1]) / 6} ${p2[0] - (p3[0] - p1[0]) / 6},${p2[1] - (p3[1] - p1[1]) / 6} ${p2[0]},${p2[1]}`;
+  }
+  const area = `${d} L${pts.at(-1)[0]},${m.t + ih} L${pts[0][0]},${m.t + ih} Z`;
+  const mean = sum / n, mx = m.l + (mean / STEP - 0.5) * iw / BINS;
+  const ticks = [0, nice / 2, nice];
+  const peak = smooth.indexOf(Math.max(...smooth));
+  host.innerHTML = `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="Histogram of ${n} ratings from 0.25 to 5, average ${mean.toFixed(2)}">
+    <defs><linearGradient id="hg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="var(--accent)" stop-opacity=".35"/><stop offset="1" stop-color="var(--accent)" stop-opacity="0"/></linearGradient></defs>
+    ${ticks.map(t => `<line x1="${m.l}" x2="${W - m.r}" y1="${y(t)}" y2="${y(t)}" stroke="var(--line)" stroke-width="1"/><text x="${m.l - 6}" y="${y(t) + 4}" text-anchor="end" font-size="11" fill="var(--muted)">${t}</text>`).join("")}
+    ${counts.map((c, i) => c ? `<rect x="${x(i) - bwPx / 2}" y="${y(c)}" width="${bwPx}" height="${m.t + ih - y(c)}" rx="${Math.min(4, bwPx / 2)}" fill="var(--accent)" fill-opacity=".18"/>` : "").join("")}
+    <path d="${area}" fill="url(#hg)"/>
+    <path d="${d}" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linejoin="round"/>
+    <circle cx="${pts[peak][0]}" cy="${pts[peak][1]}" r="4" fill="var(--accent)" stroke="var(--panel)" stroke-width="2"/>
+    <line x1="${mx}" x2="${mx}" y1="${m.t}" y2="${m.t + ih}" stroke="var(--ink)" stroke-width="1" stroke-dasharray="3 3" opacity=".55"/>
+    <text x="${mx + (mx > W - 90 ? -5 : 5)}" y="${m.t + 10}" text-anchor="${mx > W - 90 ? "end" : "start"}" font-size="11" fill="var(--ink)">avg ${mean.toFixed(2)}</text>
+    <line x1="${m.l}" x2="${W - m.r}" y1="${m.t + ih}" y2="${m.t + ih}" stroke="var(--muted)" stroke-width="1"/>
+    ${counts.map((_, i) => { const v = (i + 1) * STEP; const major = v % 1 === 0; const lab = major || (iw > 520 && v % 0.5 === 0);
+      return `<line x1="${x(i)}" x2="${x(i)}" y1="${m.t + ih}" y2="${m.t + ih + (major ? 5 : 3)}" stroke="var(--muted)"/>${lab ? `<text x="${x(i)}" y="${H - 6}" text-anchor="middle" font-size="11" fill="var(--muted)">${major ? v.toFixed(0) : v.toFixed(1)}</text>` : ""}`; }).join("")}
+    <g class="hits">${counts.map((c, i) => `<rect data-i="${i}" x="${m.l + i * iw / BINS}" y="${m.t}" width="${iw / BINS}" height="${ih}" fill="transparent"/>`).join("")}</g>
+    <line class="xh" x1="0" x2="0" y1="${m.t}" y2="${m.t + ih}" stroke="var(--ink)" stroke-width="1" opacity="0"/>
+  </svg><div class="tip" hidden></div>`;
+  const svg = host.querySelector("svg"), tip = host.querySelector(".tip"), xh = svg.querySelector(".xh");
+  const show = e => {
+    const r = e.target.closest("rect[data-i]"); if (!r) return;
+    const i = +r.dataset.i, c = counts[i];
+    const sx = svg.getBoundingClientRect().width / W;
+    xh.setAttribute("x1", x(i)); xh.setAttribute("x2", x(i)); xh.setAttribute("opacity", ".35");
+    tip.hidden = false; tip.style.left = `${Math.min(Math.max(x(i) * sx, 60), svg.getBoundingClientRect().width - 60)}px`;
+    tip.style.top = `${Math.min(y(Math.max(c, smooth[i])), m.t + ih - 10) * sx + 14}px`;
+    tip.textContent = `${((i + 1) * STEP).toFixed(2)} — ${c} check-in${c === 1 ? "" : "s"} (${Math.round(c / n * 100)}%)`;
+  };
+  const hide = () => { tip.hidden = true; xh.setAttribute("opacity", "0"); };
+  svg.addEventListener("pointermove", show); svg.addEventListener("pointerdown", show); svg.addEventListener("pointerleave", hide);
+}
+
+// ---------- IMDb insights ----------
+let interestMode = "most", showTable = false;
+
+function setSearch(q) { const i = $("#q"); i.value = q; state.q = q.toLowerCase(); state.shown = PAGE; render(false); i.scrollIntoView({ block: "start", behavior: "smooth" }); }
+
+function renderImdbInsights(rows, total) {
+  const el = $("#stats"); if (!el) return;
+  const counts = Array(10).fill(0); let n = 0, sum = 0;
+  for (const r of rows) { const v = Math.round(+r.user_rating); if (v >= 1 && v <= 10) { counts[v - 1]++; n++; sum += v; } }
+  // genres: one title counts toward each of its genres
+  const g = new Map();
+  for (const r of rows) for (const name of (r.genres || "").split(/,\s*/).filter(Boolean)) {
+    const e = g.get(name) || { n: 0, sum: 0 }; e.n++; if (r.user_rating > 0) e.sum += +r.user_rating; g.set(name, e);
+  }
+  const minTop = Math.max(5, Math.round(n * 0.01));
+  let genres = [...g].map(([name, e]) => ({ name, n: e.n, avg: e.sum / e.n }));
+  genres = interestMode === "most" ? genres.sort((a, b) => b.n - a.n)
+    : genres.filter(x => x.n >= minTop).sort((a, b) => b.avg - a.avg || b.n - a.n);
+  genres = genres.slice(0, 8);
+  const scope = rows.length === total ? `All ${total} titles` : `${rows.length} matching titles`;
+  const card = cardHead(el, "imdb", "Insights", `${scope}${n ? ` · your average ${(sum / n).toFixed(1)}` : ""}${statsOpen.imdb ? "" : " · rating breakdown and genres"}`,
+    () => renderImdbInsights(rows, total));
+  if (!card.open) { el.innerHTML = card.head; card.bind(); return; }
+  el.innerHTML = `${card.head}<div id="stats-body">
+    <div class="ins-head"><h3>Rating breakdown</h3>
+      <button type="button" class="toggle" id="tv" aria-pressed="${showTable}"><span class="sw" aria-hidden="true"></span>Table view</button></div>
+    <p class="note">Your ratings from 1 to 10 stars</p>
+    <div class="bars" id="bars"></div>
+    <div class="ins-head" style="margin-top:16px"><h3>Interests</h3></div>
+    <p class="note">Genres across your ratings · tap one to filter the list</p>
+    <div class="seg" role="group" aria-label="Interests">
+      <button type="button" data-m="most" aria-pressed="${interestMode === "most"}">Most rated</button>
+      <button type="button" data-m="top" aria-pressed="${interestMode === "top"}">Top rated</button></div>
+    <ul class="genres">${genres.length ? genres.map(x => `<li><button type="button" data-g="${esc(x.name)}">
+      <span><b>${esc(x.name)}</b><small>${x.n} rating${x.n === 1 ? "" : "s"} · <span class="star" aria-hidden="true">★</span> ${x.avg.toFixed(1)} average</small></span>
+      <span class="chev" aria-hidden="true">›</span></button></li>`).join("")
+      : `<li class="note">No genre data for these titles yet.</li>`}</ul>
+    ${interestMode === "top" && genres.length ? `<p class="note">Genres with ${minTop}+ ratings</p>` : ""}</div>`;
+  card.bind();
+  el.querySelector("#tv").onclick = () => { showTable = !showTable; renderImdbInsights(rows, total); };
+  el.querySelector(".seg").onclick = e => { const b = e.target.closest("button"); if (b) { interestMode = b.dataset.m; renderImdbInsights(rows, total); } };
+  el.querySelector(".genres").onclick = e => { const b = e.target.closest("button[data-g]"); if (b) setSearch(b.dataset.g); };
+  const host = el.querySelector("#bars");
+  if (!n) { host.innerHTML = `<p class="note">No ratings in this selection.</p>`; return; }
+  if (showTable) {
+    host.innerHTML = `<table class="mini"><thead><tr><th>Stars</th><th>Titles</th><th>Share</th></tr></thead><tbody>${counts.map((c, i) =>
+      `<tr><td>${i + 1}</td><td>${c}</td><td>${Math.round(c / n * 100)}%</td></tr>`).join("")}</tbody></table>`;
+    return;
+  }
+  const W = Math.max(280, host.clientWidth || 600), H = 150, m = { l: 4, r: 4, t: 18, b: 22 };
+  const iw = W - m.l - m.r, ih = H - m.t - m.b, slot = iw / 10, bw = slot - 6;
+  const max = Math.max(...counts), y = c => m.t + ih - (c / max) * ih;
+  const peak = counts.indexOf(max);
+  host.innerHTML = `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="Bar chart of ${n} ratings by stars, most common ${peak + 1}">
+    ${counts.map((c, i) => { const x = m.l + i * slot + 3, h = Math.max(3, m.t + ih - y(c));
+      return `<path d="M${x},${m.t + ih} V${m.t + ih - h + Math.min(4, h)} q0,-4 4,-4 H${x + bw - 4} q4,0 4,4 V${m.t + ih} Z" fill="var(--accent)" fill-opacity="${c ? 1 : .25}"/>`; }).join("")}
+    <text x="${m.l + peak * slot + slot / 2}" y="${y(max) - 6}" text-anchor="middle" font-size="11" font-weight="700" fill="var(--ink)">${max}</text>
+    ${counts.map((_, i) => `<text x="${m.l + i * slot + slot / 2}" y="${H - 5}" text-anchor="middle" font-size="12" fill="var(--muted)">${i + 1}</text>`).join("")}
+    ${counts.map((_, i) => `<rect data-i="${i}" x="${m.l + i * slot}" y="0" width="${slot}" height="${m.t + ih}" fill="transparent"/>`).join("")}
+  </svg><div class="tip" hidden></div>`;
+  const svg = host.querySelector("svg"), tip = host.querySelector(".tip");
+  const show = e => { const r = e.target.closest("rect[data-i]"); if (!r) return; const i = +r.dataset.i, sx = svg.getBoundingClientRect().width / W;
+    tip.hidden = false; tip.style.left = `${Math.min(Math.max((m.l + i * slot + slot / 2) * sx, 70), svg.getBoundingClientRect().width - 70)}px`;
+    tip.style.top = `${Math.max(y(counts[i]), m.t) * sx}px`;
+    tip.textContent = `${i + 1} star${i ? "s" : ""} — ${counts[i]} title${counts[i] === 1 ? "" : "s"} (${Math.round(counts[i] / n * 100)}%)`; };
+  svg.addEventListener("pointermove", show); svg.addEventListener("pointerdown", show); svg.addEventListener("pointerleave", () => tip.hidden = true);
+}
+
+// photo lightbox
+document.addEventListener("click", e => {
+  const b = e.target.closest(".photo"); if (!b) return;
+  const lb = document.createElement("div"); lb.className = "lightbox"; lb.setAttribute("role", "dialog"); lb.setAttribute("aria-label", "Check-in photo");
+  lb.innerHTML = `<img src="${esc(b.dataset.full)}" alt="Check-in photo">`;
+  const big = lb.querySelector("img");
+  big.onerror = () => { const alt = b.dataset.fullAlt; if (alt && big.src.indexOf(alt) < 0) big.src = alt; };
+  const close = () => { lb.remove(); document.removeEventListener("keydown", onKey); };
+  const onKey = ev => { if (ev.key === "Escape") close(); };
+  lb.onclick = close; document.addEventListener("keydown", onKey); document.body.appendChild(lb);
+});
+let rz; addEventListener("resize", () => { clearTimeout(rz); rz = setTimeout(() => VIEWS[state.tab].stats && render(false), 150); });
+init();
+</script>
+</body>
+</html>

@@ -1,0 +1,23 @@
+{
+  // Static viewer (site/) plus a tiny Worker that serves your private image
+  // backups at /photos/*, /thumbs/* and /labels/* to Cloudflare Access sign-ins only.
+  // "name" must match the Worker name in the Cloudflare dashboard.
+  "name": "brewflix",
+  "main": "worker/index.js",
+  "compatibility_date": "2026-11-01",
+  "assets": {
+    "directory": "./site",
+    "binding": "ASSETS",
+    "not_found_handling": "404-page",
+    "run_worker_first": ["/photos/*", "/thumbs/*", "/labels/*"]
+  },
+  // Private R2 bucket holding the image copies (no public access). The bucket
+  // must exist before deploying; remove this line if you skip image backups.
+  "r2_buckets": [{ "binding": "PHOTOS", "bucket_name": "brewflix-photos" }],
+  // Your Cloudflare Access app: team domain (e.g. "yourteam.cloudflareaccess.com")
+  // and the application's AUD tag. Left empty, private images are never served.
+  "vars": {
+    "ACCESS_TEAM_DOMAIN": "",
+    "ACCESS_AUD": ""
+  }
+}

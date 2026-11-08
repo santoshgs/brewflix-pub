@@ -1,0 +1,17 @@
+{
+  "imdb": {
+    "user_id": "YOUR_IMDB_USER_ID",
+    "ratings_url": "https://www.imdb.com/user/YOUR_IMDB_USER_ID/ratings/",
+    "pagination": "Next.js __NEXT_DATA__ JSON payload or 'Next' button / infinite scroll",
+    "fields": ["const_id", "title", "year", "user_rating", "imdb_rating", "date_rated", "title_type", "url"],
+    "output_base": "backups/imdb_ratings"
+  },
+  "untappd": {
+    "username": "YOUR_UNTAPPD_USERNAME",
+    "profile_url": "https://untappd.com/user/YOUR_UNTAPPD_USERNAME",
+    "beers_url": "https://untappd.com/user/YOUR_UNTAPPD_USERNAME/beers",
+    "pagination": "Click '.more_checkins' ('Show More' button) or XHR endpoint /v4/profile/checkins",
+    "fields": ["checkin_id", "beer_name", "brewery_name", "style", "abv", "ibu", "user_rating", "global_rating", "checkin_date", "serving_type", "photo_url"],
+    "output_base": "backups/untappd_checkins"
+  }
+}

@@ -1,0 +1,5 @@
+.secrets/
+site/data/
+__pycache__/
+*.json.tmp
+.pytest_cache/

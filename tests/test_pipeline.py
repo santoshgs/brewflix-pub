@@ -157,10 +157,13 @@ def test_global_rating_from_checkin_page():
     </div></body></html>"""
     assert untappd.parse_global(page_html) == 3.64643
     assert untappd.parse_global("<html><body><p>nothing</p></body></html>") is None
+    assert untappd.parse_beer_rating("<p>3.4 Ratings</p>") is None
 
     base = serve({"c1.html": page_html, "c2.html": "<html><body><p>no rating yet</p></body></html>",
                   "c4.html": "<html><body><p>no rating here either</p></body></html>",
-                  "beer9.html": page_html})
+                  "beer9.html": """<html><body><div class="beer-stats"><span>5% ABV</span>
+      <div class="ratings-row"><span class="caps" data-rating="3.65"></span><span>(3.65)</span>
+      <div><b>691</b> Ratings</div></div></div></body></html>"""})
     untappd.beer_url = lambda bid: f"{base}/beer{bid}.html"  # the beer page is the fallback source
     store = Store("backups/global_test", "checkin_id", ["checkin_id"])
     store.records = {
@@ -176,7 +179,7 @@ def test_global_rating_from_checkin_page():
     assert store.records["1"]["global_rating"] == 3.64643
     assert store.records["2"]["global_rating"] is None  # no rating on either page; left empty
     assert store.records["3"]["global_rating"] == 3.8  # already known; not overwritten
-    assert store.records["4"]["global_rating"] == 3.64643  # from the beer page
+    assert store.records["4"]["global_rating"] == 3.65  # from the beer page
 
 def test_local_date_keeps_only_the_local_day():
     from common import local_date

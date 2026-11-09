@@ -31,7 +31,7 @@ CHECKIN_FIELDS = CFG["fields"] + ["flavors", "beer_id", "checkin_url", "label_ur
 # never stored: where you drank and what you wrote are personal, not needed for a beer log
 PRIVATE_FIELDS = ("comment", "venue", "venue_name", "purchase_venue", "venue_city", "venue_state", "venue_country", "venue_lat", "venue_lng")
 # bump when the check-in page parser improves, so old check-ins get re-read
-DETAILS_VERSION = 2  # 2: also reads the global rating (from the beer page when the check-in page lacks it)
+DETAILS_VERSION = 3  # 3: global rating read from the beer page's rating row
 BEER_FIELDS = [
     "beer_id", "beer_name", "brewery_name", "style", "abv", "ibu", "user_rating",
     "global_rating", "checkin_count", "first_checkin", "last_checkin", "beer_url", "label_url",
@@ -188,6 +188,26 @@ def parse_global(html: str) -> float | None:
     return None
 
 
+def parse_beer_rating(html: str) -> float | None:
+    """The beer page's global rating: the number in brackets in the row that also shows the rating count."""
+    soup = BeautifulSoup(html, "lxml")
+    for el in soup.find_all(string=re.compile(r"\bRatings\b")):
+        row = el.parent
+        for _ in range(3):
+            if row is None:
+                break
+            if m := re.search(r"\((\d\.\d+)\)", row.get_text(" ", strip=True)):
+                return float(m.group(1))
+            row = row.parent
+    return None
+
+
+def _rating_row_markup(html: str) -> str:
+    soup = BeautifulSoup(html, "lxml")
+    el = soup.find(string=re.compile(r"\bRatings\b"))
+    return str(el.parent.parent)[:800] if el is not None else "(no 'Ratings' text on page)"
+
+
 def enrich_details(page, checkins: Store, limit: int) -> int:
     """Open individual check-in pages (oldest-unread first) to read flavour tags."""
     # re-read when the page parser has changed, or once more if the global rating is still missing
@@ -222,12 +242,10 @@ def enrich_details(page, checkins: Store, limit: int) -> int:
                 try:
                     page.goto(beer_url(rec["beer_id"]), wait_until="domcontentloaded", timeout=45_000)
                     beer_html = page.content()
-                    rec["global_rating"] = parse_global(beer_html)
+                    rec["global_rating"] = parse_beer_rating(beer_html)
                     if rec["global_rating"] is None and not logged_markup:
-                        logged_markup = True  # help future parser fixes: show the markup around the word
-                        m = re.search(r"(?i)global", beer_html)
-                        log("Untappd details: no global rating on beer page; context:\n"
-                            + (beer_html[max(0, m.start() - 300): m.start() + 600] if m else "(word 'global' not found)"))
+                        logged_markup = True  # help future parser fixes: show the rating row
+                        log("Untappd details: no rating found on beer page; rating row:\n" + _rating_row_markup(beer_html))
                     time.sleep(random.uniform(1.5, 2.0))
                 except Exception as e:
                     log(f"Untappd details: beer page {rec['beer_id']} failed ({e})")

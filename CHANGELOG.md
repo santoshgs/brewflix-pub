@@ -6,6 +6,13 @@ commits (`backup: YYYY-MM-DD`) only update `backups/` and aren't listed.
 
 ## 2026-11-09
 
+### Read the beer page's star rating for global ratings
+The beer page has no "Global" label: its rating is stars with the number in
+brackets beside the rating count. The job now reads that row, and logs it if
+it can't. Bumping `DETAILS_VERSION` to 3 gives check-ins tried under the old
+parser another attempt, so existing check-ins are re-read over the next few
+daily runs.
+
 ### Read missing Untappd global ratings from the beer page
 The check-in page doesn't carry a beer's global rating, so when it has none the
 job now reads it from the beer's own page, once per parser version, so a rating

@@ -147,6 +147,21 @@ def test_flavours_from_checkin_pages():
     assert store.records["2"]["flavors"] is None and store.records["2"]["details_v"] == untappd.DETAILS_VERSION
 
 
+def test_unique_beer_added_from_checkins_when_list_lacks_it():
+    target = fx.UNTAPPD_CHECKINS[0]["bid"]
+    listed = [c for c in fx.UNTAPPD_CHECKINS if c["bid"] != target]  # the list hasn't caught up with this beer
+    base = serve({
+        "profile.html": fx.untappd_profile(),
+        "beers.html": fx.untappd_beers_page(checkins=listed),
+    })
+    untappd.run(full=True, profile_url=f"{base}/profile.html", beers_url=f"{base}/beers.html", details_limit=0)
+    rows = {r["beer_id"]: r for r in load("untappd_beers")["items"]}
+    n = sum(1 for c in fx.UNTAPPD_CHECKINS if c["bid"] == target)
+    row = rows[str(target)]
+    assert row["checkin_count"] == n and row["beer_name"] and row["beer_url"].endswith(f"/{target}")
+    assert row["first_checkin"] and row["last_checkin"]
+
+
 def test_global_rating_from_checkin_page():
     from playwright.sync_api import sync_playwright
     from common import Store

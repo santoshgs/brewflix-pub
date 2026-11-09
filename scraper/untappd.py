@@ -202,6 +202,17 @@ def parse_beer_rating(html: str) -> float | None:
     return None
 
 
+def parse_beer_facts(html: str) -> dict:
+    """ABV and IBU from a beer page's text, when shown."""
+    text = BeautifulSoup(html, "lxml").get_text(" ", strip=True)
+    out = {}
+    if m := re.search(r"(\d+(?:\.\d+)?)\s*%\s*ABV", text):
+        out["abv"] = float(m.group(1))
+    if m := re.search(r"(\d+(?:\.\d+)?)\s*IBU\b", text):
+        out["ibu"] = float(m.group(1))
+    return out
+
+
 def _rating_row_markup(html: str) -> str:
     soup = BeautifulSoup(html, "lxml")
     el = soup.find(string=re.compile(r"\bRatings\b"))
@@ -243,6 +254,9 @@ def enrich_details(page, checkins: Store, limit: int) -> int:
                     page.goto(beer_url(rec["beer_id"]), wait_until="domcontentloaded", timeout=45_000)
                     beer_html = page.content()
                     rec["global_rating"] = parse_beer_rating(beer_html)
+                    for f, v in parse_beer_facts(beer_html).items():
+                        if rec.get(f) in (None, ""):
+                            rec[f] = v
                     if rec["global_rating"] is None and not logged_markup:
                         logged_markup = True  # help future parser fixes: show the rating row
                         log("Untappd details: no rating found on beer page; rating row:\n" + _rating_row_markup(beer_html))
@@ -354,6 +368,37 @@ def run(full: bool = False, headful: bool = False, profile_url: str | None = Non
         except Exception as e:  # never lose the feed data over this extra step
             log(f"Untappd details: stopped ({e})")
         browser.close()
+
+    # the unique-beers list is only readable logged in; add any beer that has check-ins but no row yet
+    groups: dict[str, list[dict]] = {}
+    for c in checkins.records.values():
+        if c.get("beer_id"):
+            groups.setdefault(str(c["beer_id"]), []).append(c)
+    added_beers = 0
+    for bid, rows in groups.items():
+        if bid in beers.records:
+            continue
+        latest = max(rows, key=lambda r: str(r.get("checkin_date") or ""))
+        dates = sorted(str(r["checkin_date"]) for r in rows if r.get("checkin_date"))
+        beers.upsert({
+            "beer_id": bid,
+            "beer_name": latest.get("beer_name"),
+            "brewery_name": latest.get("brewery_name"),
+            "style": latest.get("style"),
+            "abv": latest.get("abv"),
+            "ibu": latest.get("ibu"),
+            "user_rating": latest.get("user_rating"),
+            "global_rating": latest.get("global_rating"),
+            "checkin_count": len(rows),
+            "first_checkin": dates[0] if dates else None,
+            "last_checkin": dates[-1] if dates else None,
+            "beer_url": f"{BASE}/b/x/{bid}",
+            "label_url": latest.get("label_url"),
+        }, save_every=0)
+        added_beers += 1
+    if added_beers:
+        beers.save()
+        log(f"Untappd: added {added_beers} unique beers from check-ins not on the list")
 
     # enrich check-ins with beer metadata only the unique-beers list shows
     for c in checkins.records.values():

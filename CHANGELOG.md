@@ -6,6 +6,13 @@ commits (`backup: YYYY-MM-DD`) only update `backups/` and aren't listed.
 
 ## 2026-11-09
 
+### Add unique beers from check-ins when the list hasn't caught up
+The unique-beers list can only be read logged in, so beers rated since the last
+logged-in backfill were left out. Any beer that has check-ins but no row now
+gets one built from those check-ins, with ABV and IBU read from the beer page.
+Style is filled in by a logged-in backfill. Adds a test where the list leaves a
+beer out.
+
 ### Read the beer page's star rating for global ratings
 The beer page has no "Global" label: its rating is stars with the number in
 brackets beside the rating count. The job now reads that row, and logs it if

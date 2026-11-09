@@ -4,6 +4,18 @@ Every commit to Brewflix gets its own entry here, newest first, added in the
 same commit as the change. In your own copy, the backup job's daily data
 commits (`backup: YYYY-MM-DD`) only update `backups/` and aren't listed.
 
+## 2026-11-09
+
+### Fill in global ratings for new Untappd check-ins
+Check-ins rated after the last logged-in backfill were saved with no global
+rating. The check-in feed doesn't show it, and the daily job can't read the
+unique-beers list while logged out, so nothing ever filled it in. The job now
+reads the global rating from each check-in page it already opens for flavour
+tags, and only fills a blank, never overwrites one. Bumping `DETAILS_VERSION`
+to 2 re-reads existing check-ins once, so earlier gaps close over the next few
+daily runs (120 pages per run). Adds a test with a check-in page that shows a
+global rating.
+
 ## 2026-11-08
 
 ### Add this changelog

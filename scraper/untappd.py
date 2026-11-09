@@ -31,7 +31,7 @@ CHECKIN_FIELDS = CFG["fields"] + ["flavors", "beer_id", "checkin_url", "label_ur
 # never stored: where you drank and what you wrote are personal, not needed for a beer log
 PRIVATE_FIELDS = ("comment", "venue", "venue_name", "purchase_venue", "venue_city", "venue_state", "venue_country", "venue_lat", "venue_lng")
 # bump when the check-in page parser improves, so old check-ins get re-read
-DETAILS_VERSION = 1
+DETAILS_VERSION = 2  # 2: also reads the beer's global rating (the logged-out feed doesn't show it)
 BEER_FIELDS = [
     "beer_id", "beer_name", "brewery_name", "style", "abv", "ibu", "user_rating",
     "global_rating", "checkin_count", "first_checkin", "last_checkin", "beer_url", "label_url",
@@ -173,12 +173,23 @@ def parse_flavors(html: str) -> list[str]:
     return uniq
 
 
+def parse_global(html: str) -> float | None:
+    """The beer's global rating from a page, if the page shows one."""
+    soup = BeautifulSoup(html, "lxml")
+    for blk in soup.select(".ratings > div, .ratings .you"):
+        if "global" in blk.get_text(" ", strip=True).lower():
+            caps = blk.select_one("[data-rating]")
+            if caps:
+                return to_float(caps["data-rating"])
+    return None
+
+
 def enrich_details(page, checkins: Store, limit: int) -> int:
     """Open individual check-in pages (oldest-unread first) to read flavour tags."""
     todo = [r for r in checkins.records.values() if r.get("details_v") != DETAILS_VERSION and r.get("checkin_url")]
     todo.sort(key=lambda r: str(r.get("checkin_date") or ""), reverse=True)
     todo = todo[:limit]
-    found = 0
+    found = globals_found = 0
     for i, rec in enumerate(todo, 1):
         try:
             page.goto(rec["checkin_url"], wait_until="domcontentloaded", timeout=45_000)
@@ -195,14 +206,17 @@ def enrich_details(page, checkins: Store, limit: int) -> int:
             log("Untappd details: 'flavor' found but no tags parsed; context:\n"
                 + html[max(0, m.start() - 300): m.start() + 600])
         rec["flavors"] = ", ".join(flavors) or None
+        if rec.get("global_rating") in (None, ""):
+            rec["global_rating"] = parse_global(html)
+            globals_found += rec["global_rating"] is not None
         rec["details_v"] = DETAILS_VERSION
         found += bool(flavors)
         if i % 25 == 0:
             checkins.save()
-            log(f"Untappd details: {i}/{len(todo)} read, {found} with flavours")
+            log(f"Untappd details: {i}/{len(todo)} read, {found} with flavours, {globals_found} with global rating")
         time.sleep(random.uniform(1.5, 2.0))
     if todo:
-        log(f"Untappd details: read {len(todo)} check-in pages, {found} had flavour tags")
+        log(f"Untappd details: read {len(todo)} check-in pages, {found} had flavour tags, {globals_found} global ratings filled")
     return found
 
 

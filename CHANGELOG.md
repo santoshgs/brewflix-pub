@@ -6,6 +6,11 @@ commits (`backup: YYYY-MM-DD`) only update `backups/` and aren't listed.
 
 ## 2026-11-09
 
+### Log check-in page markup when no global rating is found
+The first daily run after the global-rating fix filled none, so the run log
+now shows the page markup around the word "global" when a check-in page
+yields no rating, so the parser can be adjusted from the real page.
+
 ### Fill in global ratings for new Untappd check-ins
 Check-ins rated after the last logged-in backfill were saved with no global
 rating. The check-in feed doesn't show it, and the daily job can't read the

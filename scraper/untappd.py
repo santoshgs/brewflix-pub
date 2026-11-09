@@ -209,6 +209,10 @@ def enrich_details(page, checkins: Store, limit: int) -> int:
         if rec.get("global_rating") in (None, ""):
             rec["global_rating"] = parse_global(html)
             globals_found += rec["global_rating"] is not None
+            if i == 1 and rec["global_rating"] is None and (m := re.search(r"(?i)global", html)):
+                # help future parser fixes: show the markup around the word
+                log("Untappd details: 'global' found but no rating parsed; context:\n"
+                    + html[max(0, m.start() - 300): m.start() + 600])
         rec["details_v"] = DETAILS_VERSION
         found += bool(flavors)
         if i % 25 == 0:

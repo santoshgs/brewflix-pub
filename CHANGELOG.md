@@ -6,6 +6,10 @@ commits (`backup: YYYY-MM-DD`) only update `backups/` and aren't listed.
 
 ## 2026-11-09
 
+### Report how many Untappd check-in pages were actually read
+The run log could say 120 pages were read when Untappd stopped the run early.
+The count now reports the pages actually read, out of those queued.
+
 ### Add unique beers from check-ins when the list hasn't caught up
 The unique-beers list can only be read logged in, so beers rated since the last
 logged-in backfill were left out. Any beer that has check-ins but no row now

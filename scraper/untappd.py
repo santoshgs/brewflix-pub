@@ -227,7 +227,7 @@ def enrich_details(page, checkins: Store, limit: int) -> int:
         or (r.get("global_rating") in (None, "") and r.get("global_v") != DETAILS_VERSION))]
     todo.sort(key=lambda r: str(r.get("checkin_date") or ""), reverse=True)
     todo = todo[:limit]
-    found = globals_found = 0
+    found = globals_found = done = 0
     logged_markup = False
     for i, rec in enumerate(todo, 1):
         try:
@@ -266,12 +266,13 @@ def enrich_details(page, checkins: Store, limit: int) -> int:
             globals_found += rec["global_rating"] is not None
         rec["details_v"] = DETAILS_VERSION
         found += bool(flavors)
+        done += 1
         if i % 25 == 0:
             checkins.save()
             log(f"Untappd details: {i}/{len(todo)} read, {found} with flavours, {globals_found} with global rating")
         time.sleep(random.uniform(1.5, 2.0))
     if todo:
-        log(f"Untappd details: read {len(todo)} check-in pages, {found} had flavour tags, {globals_found} global ratings filled")
+        log(f"Untappd details: read {done} of {len(todo)} check-in pages, {found} had flavour tags, {globals_found} global ratings filled")
     return found
 
 

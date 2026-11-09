@@ -6,6 +6,13 @@ commits (`backup: YYYY-MM-DD`) only update `backups/` and aren't listed.
 
 ## 2026-11-09
 
+### Read missing Untappd global ratings from the beer page
+The check-in page doesn't carry a beer's global rating, so when it has none the
+job now reads it from the beer's own page, once per parser version, so a rating
+that never appears isn't re-read every day. The run log shows the beer page
+markup if that also fails. Adds a `global_v` column to the check-in backup to
+record that attempt.
+
 ### Log check-in page markup when no global rating is found
 The first daily run after the global-rating fix filled none, so the run log
 now shows the page markup around the word "global" when a check-in page

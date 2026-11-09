@@ -158,21 +158,25 @@ def test_global_rating_from_checkin_page():
     assert untappd.parse_global(page_html) == 3.64643
     assert untappd.parse_global("<html><body><p>nothing</p></body></html>") is None
 
-    base = serve({"c1.html": page_html, "c2.html": "<html><body><p>no rating yet</p></body></html>"})
+    base = serve({"c1.html": page_html, "c2.html": "<html><body><p>no rating yet</p></body></html>",
+                  "c4.html": "<html><body><p>no rating here either</p></body></html>",
+                  "beer9.html": page_html})
+    untappd.beer_url = lambda bid: f"{base}/beer{bid}.html"  # the beer page is the fallback source
     store = Store("backups/global_test", "checkin_id", ["checkin_id"])
     store.records = {
         "1": {"checkin_id": "1", "checkin_url": f"{base}/c1.html", "checkin_date": "2026-01-02", "global_rating": None},
         "2": {"checkin_id": "2", "checkin_url": f"{base}/c2.html", "checkin_date": "2026-01-01", "global_rating": None},
         "3": {"checkin_id": "3", "checkin_url": f"{base}/c1.html", "checkin_date": "2025-12-01", "global_rating": 3.8},
+        "4": {"checkin_id": "4", "checkin_url": f"{base}/c4.html", "checkin_date": "2025-11-01", "beer_id": "9", "global_rating": None},
     }
     with sync_playwright() as p:
         b = p.chromium.launch()
         untappd.enrich_details(b.new_page(), store, limit=10)
         b.close()
     assert store.records["1"]["global_rating"] == 3.64643
-    assert store.records["2"]["global_rating"] is None  # page had none; left empty
+    assert store.records["2"]["global_rating"] is None  # no rating on either page; left empty
     assert store.records["3"]["global_rating"] == 3.8  # already known; not overwritten
-
+    assert store.records["4"]["global_rating"] == 3.64643  # from the beer page
 
 def test_local_date_keeps_only_the_local_day():
     from common import local_date

@@ -27,11 +27,11 @@ from common import ROOT, TARGETS, Store, is_challenge, launch, local_date, log, 
 
 CFG = TARGETS["untappd"]
 BASE = "https://untappd.com"
-CHECKIN_FIELDS = CFG["fields"] + ["flavors", "beer_id", "checkin_url", "label_url"]
+CHECKIN_FIELDS = CFG["fields"] + ["flavors", "beer_id", "checkin_url", "label_url", "global_v"]
 # never stored: where you drank and what you wrote are personal, not needed for a beer log
 PRIVATE_FIELDS = ("comment", "venue", "venue_name", "purchase_venue", "venue_city", "venue_state", "venue_country", "venue_lat", "venue_lng")
 # bump when the check-in page parser improves, so old check-ins get re-read
-DETAILS_VERSION = 2  # 2: also reads the beer's global rating (the logged-out feed doesn't show it)
+DETAILS_VERSION = 2  # 2: also reads the global rating (from the beer page when the check-in page lacks it)
 BEER_FIELDS = [
     "beer_id", "beer_name", "brewery_name", "style", "abv", "ibu", "user_rating",
     "global_rating", "checkin_count", "first_checkin", "last_checkin", "beer_url", "label_url",
@@ -173,6 +173,10 @@ def parse_flavors(html: str) -> list[str]:
     return uniq
 
 
+def beer_url(bid) -> str:
+    return f"{BASE}/b/x/{bid}"  # Untappd redirects any slug to the right beer
+
+
 def parse_global(html: str) -> float | None:
     """The beer's global rating from a page, if the page shows one."""
     soup = BeautifulSoup(html, "lxml")
@@ -186,10 +190,14 @@ def parse_global(html: str) -> float | None:
 
 def enrich_details(page, checkins: Store, limit: int) -> int:
     """Open individual check-in pages (oldest-unread first) to read flavour tags."""
-    todo = [r for r in checkins.records.values() if r.get("details_v") != DETAILS_VERSION and r.get("checkin_url")]
+    # re-read when the page parser has changed, or once more if the global rating is still missing
+    todo = [r for r in checkins.records.values() if r.get("checkin_url") and (
+        r.get("details_v") != DETAILS_VERSION
+        or (r.get("global_rating") in (None, "") and r.get("global_v") != DETAILS_VERSION))]
     todo.sort(key=lambda r: str(r.get("checkin_date") or ""), reverse=True)
     todo = todo[:limit]
     found = globals_found = 0
+    logged_markup = False
     for i, rec in enumerate(todo, 1):
         try:
             page.goto(rec["checkin_url"], wait_until="domcontentloaded", timeout=45_000)
@@ -207,12 +215,23 @@ def enrich_details(page, checkins: Store, limit: int) -> int:
                 + html[max(0, m.start() - 300): m.start() + 600])
         rec["flavors"] = ", ".join(flavors) or None
         if rec.get("global_rating") in (None, ""):
+            rec["global_v"] = DETAILS_VERSION  # one try per version, so a rating that never appears isn't re-read daily
             rec["global_rating"] = parse_global(html)
+            if rec["global_rating"] is None and rec.get("beer_id"):
+                # the check-in page doesn't show it; the public beer page does
+                try:
+                    page.goto(beer_url(rec["beer_id"]), wait_until="domcontentloaded", timeout=45_000)
+                    beer_html = page.content()
+                    rec["global_rating"] = parse_global(beer_html)
+                    if rec["global_rating"] is None and not logged_markup:
+                        logged_markup = True  # help future parser fixes: show the markup around the word
+                        m = re.search(r"(?i)global", beer_html)
+                        log("Untappd details: no global rating on beer page; context:\n"
+                            + (beer_html[max(0, m.start() - 300): m.start() + 600] if m else "(word 'global' not found)"))
+                    time.sleep(random.uniform(1.5, 2.0))
+                except Exception as e:
+                    log(f"Untappd details: beer page {rec['beer_id']} failed ({e})")
             globals_found += rec["global_rating"] is not None
-            if i == 1 and rec["global_rating"] is None and (m := re.search(r"(?i)global", html)):
-                # help future parser fixes: show the markup around the word
-                log("Untappd details: 'global' found but no rating parsed; context:\n"
-                    + html[max(0, m.start() - 300): m.start() + 600])
         rec["details_v"] = DETAILS_VERSION
         found += bool(flavors)
         if i % 25 == 0:

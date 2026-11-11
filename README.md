@@ -221,16 +221,21 @@ so it needs a token once and then runs on its own every day.
 1. Create a free project at <https://foursquare.com/developers>. In its OAuth
    settings add the redirect URL `https://localhost/`; note the Client ID and
    Client Secret.
-2. Run `python scripts/foursquare_token.py` on your own computer and follow
-   the prompts. It prints a token and saves nothing.
-3. Add the token as the GitHub repository secret **`FOURSQUARE_TOKEN`**.
+2. Open a Codespace on this repo (Code → Codespaces; the same one used for the
+   Untappd backfill is fine) and run `python scripts/foursquare_token.py` in
+   its terminal. Open the link it prints, approve, and paste back the address
+   you land on. Nothing runs on your own computer; a phone browser works.
+3. The script saves the token as the repository secret **`FOURSQUARE_TOKEN`**.
+   If the Codespace isn't allowed to, it shows the token once so you can paste
+   it at Settings → Secrets and variables → Actions. Stop the Codespace after.
 4. Put your profile link in the `foursquare` section of `targets.json`.
 5. Actions → Daily backup → Run workflow with *full* ticked. That walks your
    whole history; daily runs afterwards read only what is new.
 
-`FOURSQUARE_TOKEN=… python scripts/foursquare_probe.py` lists which Foursquare
-endpoints still answer for your account. It prints field names only, never
-your check-ins or the token.
+Actions → **Foursquare check** → Run workflow lists which Foursquare endpoints
+still answer for your account (useful when a counter such as mayorships or
+coins is missing). It prints field names and counts only, never your
+check-ins or the token. In a public repo that run's log is public too.
 
 **Foursquare's own data export** (Foursquare → Settings → request your data):
 drop the unzipped folder at `backups/foursquare_export/`, or the file as

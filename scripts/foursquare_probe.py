@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 """Check which Foursquare v2 endpoints still answer for your token.
 
+Run it on GitHub: Actions > Foursquare check > Run workflow (it uses the
+FOURSQUARE_TOKEN secret). Or in a Codespace:
+
   FOURSQUARE_TOKEN=... python scripts/foursquare_probe.py
 
 Prints a status line and the names of the fields each endpoint returns. It
@@ -46,7 +49,7 @@ def shape(v, depth=0):
 
 def main():
     if not TOKEN:
-        sys.exit("Set FOURSQUARE_TOKEN first.")
+        sys.exit("No FOURSQUARE_TOKEN: add the repository secret first (see scripts/foursquare_token.py).")
     newest = None
     checks = [
         ("users/self", {}),

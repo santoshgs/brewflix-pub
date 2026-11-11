@@ -6,6 +6,13 @@ commits (`backup: YYYY-MM-DD`) only update `backups/` and aren't listed.
 
 ## 2026-11-11
 
+### Foursquare setup without using your own computer
+The token helper is now meant for a Codespace: it saves the token straight
+into the `FOURSQUARE_TOKEN` repository secret through the GitHub CLI and only
+shows it if that isn't permitted. A new manual workflow, *Foursquare check*,
+runs the endpoint probe on GitHub with that secret. The setup steps in the
+README are rewritten to match.
+
 ### Add Foursquare / Swarm check-ins
 A third service: Swarm check-ins are backed up through Foursquare's API with
 place, category, location, your comment, tagged friends, time and photos, plus

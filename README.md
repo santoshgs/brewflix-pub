@@ -214,6 +214,7 @@ so it needs a token once and then runs on its own every day.
 |---|---|---|
 | `backups/foursquare_checkins.json/.csv` | check-in (`checkin_id`) | place, category, neighbourhood, city, province/state, country, address, coordinates, your comment, friends you tagged, date and time at the place, photo URLs, backup markers |
 | `backups/foursquare_places.json/.csv` | place (`venue_id`) | name, category, location, number of check-ins, first and last visit |
+| `backups/foursquare_tips.json/.csv` | tip you wrote (`tip_id`) | text, place, city, date, link, photo URL |
 | `backups/foursquare_profile.json` | — | name, join date and counters (mayorships, tips and so on when Foursquare still reports them; the rest are counted from your check-ins) |
 
 **One-time setup**
@@ -254,6 +255,11 @@ comment, who you were with, your photos), and a *Timeline* card that starts
 closed: check-ins by year, a world map with heat spots that turns into one dot
 per place as you zoom in, rankings by country, province/state and city (tap
 one to filter), and a sortable table of every place visited.
+
+Tap the **Tips** or **Photos** counter on the profile card to see all of your
+tips, or every check-in photo in one grid (tap a photo for full size). The
+**From** and **To** date boxes beside the search narrow the list, and the
+Timeline with it, to a date range; the Untappd check-ins tab has them too.
 
 **Privacy.** This is a location diary, so it is treated more strictly than the
 rest:

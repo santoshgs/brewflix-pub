@@ -223,8 +223,9 @@ so it needs a token once and then runs on its own every day.
    Client Secret.
 2. Open a Codespace on this repo (Code → Codespaces; the same one used for the
    Untappd backfill is fine) and run `python scripts/foursquare_token.py` in
-   its terminal. Open the link it prints, approve, and paste back the address
-   you land on. Nothing runs on your own computer; a phone browser works.
+   its terminal. Open the link it prints and approve. Your browser then says
+   it can't connect to "localhost": that is expected. Copy the address it shows
+   (`localhost/?code=…`) and paste it into the terminal. Nothing runs on your own computer; a phone browser works.
 3. The script saves the token as the repository secret **`FOURSQUARE_TOKEN`**.
    If the Codespace isn't allowed to, it shows the token once so you can paste
    it at Settings → Secrets and variables → Actions. Stop the Codespace after.

@@ -6,6 +6,13 @@ commits (`backup: YYYY-MM-DD`) only update `backups/` and aren't listed.
 
 ## 2026-11-11
 
+### Say that the "can't connect to localhost" page is the expected result
+After approving on Foursquare the browser shows a connection error for
+`localhost`, which looked like a failure. The token helper and the README now
+say this is expected and that the code to paste is in that address. The helper
+also accepts the address without `https://` and ignores the `#_=_` Foursquare
+adds to the end.
+
 ### Foursquare setup without using your own computer
 The token helper is now meant for a Codespace: it saves the token straight
 into the `FOURSQUARE_TOKEN` repository secret through the GitHub CLI and only

@@ -32,9 +32,13 @@ def main():
     client_secret = getpass.getpass("Client Secret (hidden): ").strip()
     auth = "https://foursquare.com/oauth2/authenticate?" + urllib.parse.urlencode(
         {"client_id": client_id, "response_type": "code", "redirect_uri": REDIRECT})
-    print(f"\nOpen this link, approve, then copy the address you land on:\n\n  {auth}\n")
-    landed = input("Paste that address (or just the code): ").strip()
+    print(f"\nOpen this link and approve:\n\n  {auth}\n")
+    print("Your browser will then say it can't connect to \"localhost\". That is expected and means it worked:")
+    print("the address bar (or the error message) now holds  localhost/?code=XXXX…  Copy that whole address,")
+    print("or just the letters and digits after code=, and paste it here. The code works once and expires quickly.\n")
+    landed = input("Paste it here: ").strip().strip('"“”')
     code = urllib.parse.parse_qs(urllib.parse.urlparse(landed).query).get("code", [landed])[0]
+    code = code.split("#")[0].split("&")[0].strip()
     url = "https://foursquare.com/oauth2/access_token?" + urllib.parse.urlencode(
         {"client_id": client_id, "client_secret": client_secret, "grant_type": "authorization_code",
          "redirect_uri": REDIRECT, "code": code})

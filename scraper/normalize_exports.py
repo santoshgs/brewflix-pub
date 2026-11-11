@@ -3,6 +3,8 @@
 Looks in the repo root and imports/ for:
   imdb_ratings.csv        (IMDb > Your Ratings > Export)
   untappd_export.json/.csv (Untappd Insiders > Download History)
+and in backups/ or imports/ for:
+  foursquare_export/ or foursquare_export.zip (Foursquare > Settings > data export)
 
 Rows are merged into the same stores the scrapers use, so an export
 gives a full history and the daily scrape keeps it current.
@@ -141,6 +143,14 @@ def main() -> list[str]:
             untappd_from_export(p)
             covered.append("untappd")
             break
+    try:
+        import foursquare
+
+        if foursquare._export_sources() and "YOUR_" not in json.dumps(TARGETS.get("foursquare", {"x": "YOUR_"})):
+            foursquare.import_export()
+            covered.append("foursquare")
+    except Exception as e:  # an odd export must never stop the daily backup
+        log(f"Foursquare export: could not be read ({e}); the API backup still runs")
     if not covered:
         log("no native exports found; scrapers will do a full backfill")
     return covered

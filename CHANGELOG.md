@@ -4,6 +4,23 @@ Every commit to Brewflix gets its own entry here, newest first, added in the
 same commit as the change. In your own copy, the backup job's daily data
 commits (`backup: YYYY-MM-DD`) only update `backups/` and aren't listed.
 
+## 2026-11-11
+
+### Add Foursquare / Swarm check-ins
+A third service: Swarm check-ins are backed up through Foursquare's API with
+place, category, location, your comment, tagged friends, time and photos, plus
+a roll-up of places and a profile file. It runs in the daily job once you add
+a `FOURSQUARE_TOKEN` secret (`scripts/foursquare_token.py` creates one) and
+fill in the `foursquare` section of `targets.json`; without them it is
+skipped. Foursquare's own data export can be dropped into
+`backups/foursquare_export/` to fill gaps. The site gains a Swarm check-ins
+tab with a profile card and a Timeline card (check-ins by year, a zoomable
+map, rankings by country, province/state and city, and a sortable list of
+places). The Worker checks the Cloudflare Access token before serving the
+Swarm data files as well as the images. Likes and other people's comments are
+never stored. Venue photos are not fetched yet: the place thumbnail is the
+category icon.
+
 ## 2026-11-09
 
 ### Report how many Untappd check-in pages were actually read

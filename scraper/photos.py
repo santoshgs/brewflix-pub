@@ -8,6 +8,9 @@ check-in of that beer):
   thumbs/<checkin_id>.webp   160px square crop   (list thumbnail)
   labels/<hash>.webp         longest side 200px  (beer label or brewery logo)
 
+Swarm check-in photos and category icons go under fsq-photos/, fsq-thumbs/ and
+fsq-cats/ (see backup_foursquare).
+
 The Worker serves them at /photos/…, /thumbs/… and /labels/… only to visitors
 who pass Cloudflare Access. Nothing is written to the git repo except the
 "photo_backup" / "label_backup" markers on each record.
@@ -166,6 +169,82 @@ def backup(put=None, limit: int = int(os.environ.get("PHOTOS_PER_RUN", "600")), 
     return saved
 
 
+def backup_foursquare(put=None, limit: int = int(os.environ.get("FSQ_PHOTOS_PER_RUN", "600")), delay: float = 0.2) -> int:
+    """Copy Swarm check-in photos, category icons and the profile picture to R2.
+
+      fsq-photos/<checkin_id>-<n>.webp   longest side 640px
+      fsq-thumbs/<checkin_id>-<n>.webp   160px square crop
+      fsq-cats/<category_id>.webp        category icon, once per category
+      fsq-cats/avatar.webp               your profile picture
+
+    `photo_backup` on a check-in is how many of its photos are in the bucket.
+    """
+    import json
+    import re
+
+    import foursquare
+    from common import DATA_ROOT
+
+    put = put or r2_uploader()
+    if put is None:
+        return 0
+    store = foursquare.checkin_store()
+    saved = 0
+    todo = [r for r in store.rows() if r.get("photo_urls") and int(r.get("photo_backup") or 0) < len(r["photo_urls"].split())]
+    for rec in todo:
+        if saved >= limit:
+            break
+        urls = rec["photo_urls"].split()
+        done = int(rec.get("photo_backup") or 0)
+        for n, url in enumerate(urls[done:], done + 1):
+            try:
+                full, thumb = optimise(download(url))
+                put(f"fsq-photos/{rec['checkin_id']}-{n}.webp", full)
+                put(f"fsq-thumbs/{rec['checkin_id']}-{n}.webp", thumb)
+            except Exception as e:
+                log(f"Swarm photos: {rec['checkin_id']} #{n} failed ({e}); will retry next run")
+                break
+            rec["photo_backup"] = n
+            saved += 1
+            time.sleep(delay)
+        if saved and saved % 50 == 0:
+            store.save()
+    # category icons: one per category, shared by every check-in in it
+    icons: dict[str, list[dict]] = {}
+    for r in store.records.values():
+        cid = str(r.get("category_id") or "")
+        if r.get("category_icon") and re.fullmatch(r"[0-9a-z]{1,32}", cid) and r.get("category_icon_backup") != f"fsq-cats/{cid}.webp":
+            icons.setdefault(cid, []).append(r)
+    for cid, recs in icons.items():
+        key = f"fsq-cats/{cid}.webp"
+        try:
+            put(key, optimise_label(download(recs[0]["category_icon"])))
+        except Exception as e:
+            log(f"Swarm icons: {cid} failed ({e}); will retry next run")
+            continue
+        for r in recs:
+            r["category_icon_backup"] = key
+        saved += 1
+        time.sleep(delay / 2)
+    store.save()
+    foursquare.rebuild_places(store)
+    prof_path = DATA_ROOT / "backups" / "foursquare_profile.json"
+    if prof_path.exists():
+        prof = json.loads(prof_path.read_text())
+        if prof.get("avatar_url") and prof.get("avatar_backup") != "fsq-cats/avatar.webp":
+            try:
+                put("fsq-cats/avatar.webp", optimise_label(download(prof["avatar_url"])))
+                prof["avatar_backup"] = "fsq-cats/avatar.webp"
+                prof_path.write_text(json.dumps(prof, indent=2, ensure_ascii=False))
+                saved += 1
+            except Exception as e:
+                log(f"Swarm profile picture failed ({e}); will retry next run")
+    if saved:
+        log(f"Swarm images: saved {saved} photos and icons to R2")
+    return saved
+
+
 if __name__ == "__main__":
     backup()
     backup_labels()
+    backup_foursquare()

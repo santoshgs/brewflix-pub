@@ -146,3 +146,60 @@ def untappd_beers_page(checkins=UNTAPPD_CHECKINS, page_size=25):
 <a class="yellow button more_beers more-list-items" href="javascript:void(0);">Show More</a>
 <script type="text/html" id="rest">{''.join(items[page_size:])}</script>
 {_more_script('a.more_beers', 'beers', page_size, 0)}</body></html>"""
+
+
+# ---- Foursquare / Swarm: the shape of the v2 API's check-in objects (invented data) ----
+FSQ_CITIES = [
+    ("Toronto", "ON", "Canada", "CA", "Leslieville", 43.66, -79.33, -240),
+    ("Toronto", "ON", "Canada", "CA", None, 43.65, -79.38, -300),
+    ("Montréal", "QC", "Canada", "CA", "Plateau", 45.52, -73.58, -240),
+    ("New York", "NY", "United States", "US", None, 40.71, -74.0, -240),
+    ("Lisbon", None, "Portugal", "PT", "Alfama", 38.71, -9.13, 60),
+    ("Tokyo", "Tokyo", "Japan", "JP", "Shibuya", 35.66, 139.7, 540),
+]
+FSQ_CATS = [("4bf58dd8d48988d16a941735", "Bakery"), ("4bf58dd8d48988d163941735", "Park"),
+            ("4bf58dd8d48988d1e0931735", "Coffee Shop"), ("4bf58dd8d48988d129951735", "Train Station")]
+
+
+def fsq_checkin(i, photo_base="https://fastly.4sqi.net/img/general/"):
+    """Check-in number i, where 0 is the newest. Every 40th is a different venue-less shout."""
+    city, state, country, cc, hood, lat, lng, offset = FSQ_CITIES[i % len(FSQ_CITIES)]
+    cat_id, cat = FSQ_CATS[i % len(FSQ_CATS)]
+    venue_n = i % 45
+    item = {
+        "id": f"{0x5f00000000000000000000 + (100000 - i):024x}",
+        "createdAt": 1793500000 - i * 86400 * 2 - (i % 7) * 3600,
+        "timeZoneOffset": offset,
+        "type": "checkin",
+        "likes": {"count": 2, "groups": [{"items": [{"firstName": "Nosy", "lastName": "Neighbour"}]}]},
+        "comments": {"count": 1, "items": [{"text": "someone else's words", "user": {"firstName": "Other"}}]},
+        "like": False,
+        "isMayor": i % 50 == 0,
+    }
+    if i % 40 != 39:
+        item["venue"] = {
+            "id": f"{0x4a00000000000000000000 + venue_n:024x}", "name": f"Sample Place {venue_n}",
+            "location": {k: v for k, v in dict(address=f"{venue_n} Example St", crossStreet="at Sample Ave", neighborhood=hood,
+                                               city=city, state=state, postalCode="A1A 1A1", country=country, cc=cc,
+                                               lat=lat + venue_n / 1000, lng=lng + venue_n / 1000).items() if v is not None},
+            "categories": [{"id": cat_id, "name": cat, "primary": True,
+                            "icon": {"prefix": "https://ss3.4sqi.net/img/categories_v2/sample/x_", "suffix": ".png"}}],
+        }
+    if i % 6 == 0:
+        item["shout"] = f"Shout number {i} & more"
+    if i % 9 == 0:
+        item["with"] = [{"id": "77", "firstName": "Alex", "lastName": "Example"}, {"id": "78", "firstName": "Sam"}]
+    if i % 10 == 0:
+        n = 2 if i % 20 == 0 else 1
+        item["photos"] = {"count": n, "items": [{"id": f"ph{i}{k}", "prefix": photo_base, "suffix": f"/{i}_{k}.jpg",
+                                                 "width": 1200, "height": 900} for k in range(n)]}
+    if i % 33 == 0:
+        item["private"] = True
+    return item
+
+
+FSQ_USER = {"id": "1234", "firstName": "Sample", "lastName": "Person", "homeCity": "Toronto, ON", "createdAt": 1268000000,
+            "canonicalUrl": "https://app.foursquare.com/user/1234",
+            "photo": {"prefix": "https://fastly.4sqi.net/img/user/", "suffix": "/avatar.jpg"},
+            "checkins": {"count": 620}, "mayorships": {"count": 3}, "tips": {"count": 11},
+            "friends": {"count": 40}, "lists": {"count": 2}, "photos": {"count": 99}}

@@ -351,6 +351,241 @@ def test_poster_backfill_marks_misses_and_skips_done(monkeypatch=None):
         imdb.fetch_poster = real
     assert calls == []
 
+# ---------------------------------------------------------------- Foursquare / Swarm
+class FsqApi:
+    """A tiny stand-in for api.foursquare.com/v2 (checkins paging, profile, 401 mode)."""
+
+    def __init__(self, total=620, max_page=250):
+        self.total, self.max_page, self.reject, self.calls = total, max_page, False, []
+        self.extra = []  # newer check-ins put in front of the generated ones
+        api = self
+
+        class H(http.server.BaseHTTPRequestHandler):
+            def log_message(self, *a):
+                pass
+
+            def do_GET(self):
+                from urllib.parse import parse_qs, urlparse
+
+                u = urlparse(self.path)
+                q = {k: v[0] for k, v in parse_qs(u.query).items()}
+                api.calls.append((u.path, q))
+                if api.reject or self.headers.get("Authorization") != "Bearer test-token":
+                    return self.send(401, {"meta": {"code": 401, "errorType": "invalid_auth"}})
+                if u.path == "/v2/users/self":
+                    return self.send(200, {"response": {"user": fx.FSQ_USER}})
+                if u.path == "/v2/users/self/checkins":
+                    items = api.extra + [fx.fsq_checkin(i) for i in range(api.total)]
+                    off, lim = int(q.get("offset", 0)), min(int(q.get("limit", 20)), api.max_page)
+                    return self.send(200, {"response": {"checkins": {"count": len(items), "items": items[off:off + lim]}}})
+                self.send(404, {"meta": {"code": 404, "errorType": "endpoint_error"}})
+
+            def send(self, code, body):
+                data = json.dumps(body).encode()
+                self.send_response(code)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(data)))
+                self.end_headers()
+                self.wfile.write(data)
+
+        srv = http.server.ThreadingHTTPServer(("127.0.0.1", 0), H)
+        threading.Thread(target=srv.serve_forever, daemon=True).start()
+        self.base = f"http://127.0.0.1:{srv.server_address[1]}/v2"
+
+
+def _fsq_reset():
+    for f in (TMP / "backups").glob("foursquare_*"):
+        if f.is_file():
+            f.unlink()
+
+
+def test_foursquare_full_incremental_and_privacy():
+    import foursquare
+
+    _fsq_reset()
+    api = FsqApi(max_page=100)  # a smaller real page size than asked for must still walk everything
+    os.environ["FOURSQUARE_API_BASE"], os.environ["FOURSQUARE_TOKEN"] = api.base, "test-token"
+    try:
+        assert foursquare.run(full=True, delay=0) == 620
+        data = load("foursquare_checkins")
+        assert data["count"] == 620 and len(csv_rows("foursquare_checkins")) == 620
+        items = data["items"]
+        assert [r["created_ts"] for r in items] == sorted((r["created_ts"] for r in items), reverse=True)
+        by = {r["checkin_id"]: r for r in items}
+        first = by[fx.fsq_checkin(0)["id"]]
+        assert first["venue_name"] == "Sample Place 0" and first["category"] == "Bakery" and first["neighborhood"] == "Leslieville"
+        assert first["city"] == "Toronto" and first["state"] == "ON" and first["country"] == "Canada" and first["cc"] == "CA"
+        assert first["shout"] == "Shout number 0 & more" and first["with_friends"] == "Alex Example; Sam"
+        assert first["photo_count"] == 2 and len(first["photo_urls"].split()) == 2 and "/original/" in first["photo_urls"]
+        assert first["category_icon"].endswith("x_bg_64.png") and first["is_mayor"] is True and first["private"] is True
+        assert first["created_at"].endswith("-04:00") and first["checkin_date"] == first["created_at"][:10]
+        # other people's likes and comments are never stored, anywhere
+        raw = (TMP / "backups" / "foursquare_checkins.json").read_text() + (TMP / "backups" / "foursquare_checkins.csv").read_text()
+        assert "Nosy" not in raw and "someone else" not in raw and '"likes"' not in raw and '"comments"' not in raw
+        # a shout with no venue is kept, with empty place fields
+        lone = by[fx.fsq_checkin(39)["id"]]
+        assert not lone.get("venue_id") and lone["checkin_date"]
+        # places roll-up
+        places = {p["venue_id"]: p for p in load("foursquare_places")["items"]}
+        assert len(places) == 45 and sum(p["checkin_count"] for p in places.values()) == 620 - 620 // 40
+        p0 = places[fx.fsq_checkin(0)["venue"]["id"]]
+        assert p0["first_checkin"] < p0["last_checkin"] and p0["last_checkin"] == first["checkin_date"]
+        # profile: API counters and derived ones are told apart; missing ones are simply absent
+        prof = json.loads((TMP / "backups" / "foursquare_profile.json").read_text())
+        st = prof["stats"]
+        assert prof["name"] == "Sample Person" and prof["joined"] == "2010-03-07" and prof["profile_url"].startswith("https://app.foursquare.com/user/")
+        assert st["mayorships"] == {"value": 3, "source": "api"} and st["tips"]["value"] == 11 and st["checkins"]["value"] == 620
+        assert "coins" not in st and "stickers" not in st
+        assert st["places"] == {"value": 45, "source": "derived"} and st["countries"]["value"] == 4
+        assert foursquare.LAST_RUN == {"api_count": 620, "stored_count": 620}
+
+        # nothing new: one page is read and the run stops
+        api.calls.clear()
+        assert foursquare.run(full=False, delay=0) == 0
+        assert len([c for c in api.calls if c[0].endswith("/checkins")]) == 1
+
+        # one new check-in on top: exactly one is added, backup markers on old rows survive
+        st2 = foursquare.checkin_store()
+        st2.records[first["checkin_id"]]["photo_backup"] = 2
+        st2.save()
+        newer = fx.fsq_checkin(0)
+        newer.update(id="6a" + "0" * 22, createdAt=1793600000, shout="Newest one")
+        api.extra = [newer]
+        assert foursquare.run(full=False, delay=0) == 1
+        data = load("foursquare_checkins")
+        assert data["count"] == 621 and data["items"][0]["shout"] == "Newest one"
+        assert {r["checkin_id"]: r for r in data["items"]}[first["checkin_id"]]["photo_backup"] == 2
+
+        # a rejected token fails loudly and leaves the saved data alone
+        api.reject = True
+        try:
+            foursquare.run(full=False, delay=0)
+            raise AssertionError("expected the rejected token to raise")
+        except foursquare.ApiError as e:
+            assert "FOURSQUARE_TOKEN" in str(e)
+        assert load("foursquare_checkins")["count"] == 621
+
+        # no token at all: skipped quietly (clones and the public copy)
+        os.environ["FOURSQUARE_TOKEN"] = ""
+        assert foursquare.run() == 0 and foursquare.LAST_RUN == {"skipped": True}
+    finally:
+        os.environ.pop("FOURSQUARE_API_BASE", None)
+        os.environ.pop("FOURSQUARE_TOKEN", None)
+
+
+def test_foursquare_times_are_local_to_the_place():
+    import foursquare
+
+    late = foursquare.normalise({"id": "a" * 24, "createdAt": 1793503800, "timeZoneOffset": -240})  # 2026-11-01 03:30 UTC
+    assert late["created_at"] == "2026-10-31T23:30:00-04:00" and late["checkin_date"] == "2026-10-31"
+    tokyo = foursquare.normalise({"id": "b" * 24, "createdAt": "1522771200", "timeZoneOffset": 540})  # 2018-04-03 16:00 UTC
+    assert tokyo["created_at"] == "2018-04-04T01:00:00+09:00" and tokyo["checkin_date"] == "2018-04-04"
+    assert foursquare.normalise({"id": "c" * 24}) is None and foursquare.normalise({"createdAt": 1}) is None
+    assert foursquare.longest_streak({"2026-01-01", "2026-01-02", "2026-01-03", "2026-01-05"}) == 3
+
+
+def test_foursquare_export_fills_gaps_without_overriding():
+    import zipfile
+
+    import foursquare
+
+    _fsq_reset()
+    store = foursquare.checkin_store()
+    known = fx.fsq_checkin(1)
+    rec = foursquare.normalise(known)
+    rec["shout"] = None            # a gap the export can fill
+    rec["venue_name"] = "Name from the API"
+    store.upsert(rec, save_every=0)
+    store.save()
+    export_known = dict(known, shout="Only in the export")
+    export_known["venue"] = dict(known["venue"], name="Older name in the export")
+    older = fx.fsq_checkin(700)    # not in the API backup at all
+    exp = TMP / "backups" / "foursquare_export"
+    exp.mkdir(parents=True, exist_ok=True)
+    (exp / "checkins1.json").write_text(json.dumps({"items": [export_known, {"no": "id"}]}))
+    (exp / "tips.json").write_text(json.dumps({"items": [{"id": "x", "createdAt": 1}]}))  # not check-ins: ignored
+    with zipfile.ZipFile(TMP / "backups" / "foursquare_export.zip", "w") as z:
+        z.writestr("export/checkins2.json", json.dumps([older]))
+    assert foursquare.import_export() == 1
+    by = {r["checkin_id"]: r for r in load("foursquare_checkins")["items"]}
+    assert len(by) == 2
+    assert by[known["id"]]["shout"] == "Only in the export" and by[known["id"]]["venue_name"] == "Name from the API"
+    assert by[older["id"]]["source"] == "export" and by[older["id"]]["venue_name"]
+    assert foursquare.import_export() == 0  # safe to leave the export in place
+    assert (exp / "checkins1.json").exists() and len(load("foursquare_places")["items"]) == 2
+    import shutil
+
+    shutil.rmtree(exp)
+    (TMP / "backups" / "foursquare_export.zip").unlink()
+
+
+def test_swarm_photos_icons_and_avatar_go_to_private_bucket():
+    import io
+    from PIL import Image
+
+    import foursquare
+    import photos
+
+    _fsq_reset()
+    img = Image.new("RGB", (1200, 900), (40, 120, 180))
+    exif = Image.Exif()
+    exif[0x8825] = {1: "N", 2: (43.0, 39.0, 0.0)}
+    jpg = io.BytesIO(); img.save(jpg, "JPEG", exif=exif)
+    png = io.BytesIO(); Image.new("RGBA", (64, 64), (1, 2, 3, 0)).save(png, "PNG")
+    base = serve({})
+    for name, data in (("a.jpg", jpg), ("b.jpg", jpg), ("icon.png", png), ("me.jpg", jpg)):
+        (SITE / name).write_bytes(data.getvalue())
+    store = foursquare.checkin_store()
+    cid, cid2 = "5f" + "0" * 22, "5f" + "0" * 21 + "1"
+    store.records = {
+        cid: {"checkin_id": cid, "created_ts": 2, "checkin_date": "2026-01-02", "venue_id": "v1", "venue_name": "P",
+              "photo_urls": f"{base}/a.jpg {base}/b.jpg", "photo_count": 2, "category_id": "4bf58dd8d48988d16a941735", "category_icon": f"{base}/icon.png"},
+        cid2: {"checkin_id": cid2, "created_ts": 1, "checkin_date": "2026-01-01", "venue_id": "v1", "venue_name": "P",
+               "photo_urls": f"{base}/gone.jpg", "photo_count": 1, "category_id": "4bf58dd8d48988d16a941735", "category_icon": f"{base}/icon.png"},
+    }
+    store.save()
+    (TMP / "backups" / "foursquare_profile.json").write_text(json.dumps({"name": "S", "avatar_url": f"{base}/me.jpg", "stats": {}}))
+    up = {}
+    assert photos.backup_foursquare(put=lambda k, d: up.__setitem__(k, d), delay=0) == 4  # 2 photos, 1 icon, 1 avatar
+    assert set(up) == {f"fsq-photos/{cid}-1.webp", f"fsq-photos/{cid}-2.webp", f"fsq-thumbs/{cid}-1.webp", f"fsq-thumbs/{cid}-2.webp",
+                       "fsq-cats/4bf58dd8d48988d16a941735.webp", "fsq-cats/avatar.webp"}
+    full = Image.open(io.BytesIO(up[f"fsq-photos/{cid}-1.webp"]))
+    assert full.format == "WEBP" and max(full.size) == 640 and not full.getexif() and "exif" not in full.info
+    by = {r["checkin_id"]: r for r in load("foursquare_checkins")["items"]}
+    assert by[cid]["photo_backup"] == 2 and not by[cid2].get("photo_backup")
+    assert by[cid2]["category_icon_backup"] == "fsq-cats/4bf58dd8d48988d16a941735.webp"
+    assert load("foursquare_places")["items"][0]["category_icon_backup"] == "fsq-cats/4bf58dd8d48988d16a941735.webp"
+    assert json.loads((TMP / "backups" / "foursquare_profile.json").read_text())["avatar_backup"] == "fsq-cats/avatar.webp"
+    up.clear()
+    assert photos.backup_foursquare(put=lambda k, d: up.__setitem__(k, d), delay=0) == 0 and up == {}  # the missing one is retried, nothing redone
+    assert photos.backup_foursquare() == 0  # no R2 secrets: skipped quietly
+
+
+def test_worker_only_serves_swarm_paths_it_knows():
+    """The Worker's path patterns, checked from here so a typo can't open the bucket."""
+    import re
+
+    src = (Path(__file__).resolve().parent.parent / "worker" / "index.js").read_text()
+    swarm = re.compile(re.search(r"const SWARM = /(.+)/;", src).group(1).replace("\\/", "/"))
+    data = re.compile(re.search(r"const SWARM_DATA = /(.+)/;", src).group(1).replace("\\/", "/"))
+    cid = "5f" + "0" * 22
+    for ok in (f"/fsq-photos/{cid}-1.webp", f"/fsq-thumbs/{cid}-12.webp", f"/fsq-venues/{cid}.webp", "/fsq-cats/avatar.webp", "/fsq-cats/4bf58dd8d48988d16a941735.webp"):
+        assert swarm.match(ok), ok
+    for bad in (f"/fsq-photos/{cid}.webp", "/fsq-photos/../photos/1.webp", f"/fsq-photos/{cid}-1.jpg", "/fsq-cats/a/b.webp", "/fsq-other/x.webp"):
+        assert not swarm.match(bad), bad
+    assert data.match("/data/foursquare_checkins.json") and data.match("/data/foursquare_places.csv") and data.match("/data/foursquare_profile.json")
+    assert not data.match("/data/imdb_ratings.json") and not data.match("/data/foursquare_x/../status.json")
+    cfg = (Path(__file__).resolve().parent.parent / "wrangler.jsonc").read_text()
+    assert all(p in cfg for p in ('"/fsq-photos/*"', '"/fsq-thumbs/*"', '"/fsq-cats/*"', '"/data/foursquare_*"'))
+
+
+
+def test_location_diary_never_ships_with_placeholder_targets():
+    """Guards the public copy: a repo still on YOUR_… placeholders must not carry anyone's Swarm data."""
+    root = Path(__file__).resolve().parent.parent
+    if "YOUR_" in (root / "targets.json").read_text():
+        assert not list((root / "backups").glob("foursquare_*")), "Swarm data found in a repo with placeholder targets"
+
 
 if __name__ == "__main__":
     for name, fn in list(globals().items()):

@@ -1,7 +1,7 @@
 # Brewflix
 
-**Your IMDb ratings and Untappd check-ins, backed up daily and browsable on
-your own private website, all on free tiers.**
+**Your IMDb ratings, Untappd check-ins and Foursquare/Swarm check-ins, backed
+up daily and browsable on your own private website, all on free tiers.**
 
 Brewflix copies your ratings and check-ins into plain JSON and CSV files in your
 own GitHub repo every morning, keeps your photos and beer labels in a private
@@ -37,8 +37,16 @@ paywall or disappear, your history is still yours.
 
 ![Unique beers with style, ABV, IBU and ratings](docs/screenshots/unique-beers.png)
 
+**Foursquare / Swarm**
+- Every check-in with its place, category, neighbourhood and city, your
+  comment, who you were with and your photos.
+- A profile card with your counters, and a **Timeline** card: check-ins by
+  year, a zoomable map, rankings by country, province/state and city, and a
+  sortable list of every place you've visited.
+- Set up separately; see [Foursquare / Swarm check-ins](#foursquare--swarm-check-ins).
+
 **Everywhere**
-- Links to your IMDb and Untappd profiles at the top of the page.
+- Links to your IMDb, Untappd and Foursquare profiles at the top of the page.
 - Search any tab; the stats cards follow your search (type "IPA" for IPA stats).
 - Download any list as CSV or JSON.
 - Works on a phone: extra columns fold into the line under each title.
@@ -51,7 +59,7 @@ GitHub Actions — daily                               Cloudflare
 ┌─────────────────────────────────────────┐        ┌────────────────────────────────────┐
 │ scraper/run_all.py                      │  push  │ Worker (Workers Builds)            │
 │  1. import native exports (imports/)    │ ─────▶ │  site/: static viewer + insights   │
-│  2. IMDb + Untappd via Playwright       │        │  /photos /thumbs /labels    ▲      │
+│  2. IMDb + Untappd (browser), Swarm (API)│        │  /photos /thumbs /labels    ▲      │
 │  3. merge → backups/*.json + *.csv      │        │  only with an Access token  │      │
 │  4. copy photos + labels to R2──────────┼──────▶ │  private R2 bucket ─────────┘      │
 │  5. commit (git history = snapshots)    │        │  (no public URL)                   │
@@ -73,7 +81,8 @@ GitHub Actions — daily                               Cloudflare
 
 ## Privacy and security
 
-Built to be safe in a public repo:
+Built to be safe in a public repo, as long as you don't turn on the Swarm
+backup there (a repo holding Swarm check-ins should be private; see below):
 
 - **Never stored:** where you drank or bought a beer (venue, location,
   coordinates) and your check-in comments. Check-in times are reduced to the
@@ -194,6 +203,72 @@ Codespace's history differs from GitHub's, run:
 git fetch origin main && git show FETCH_HEAD:scripts/codespace_resync.sh | bash
 ```
 
+## Foursquare / Swarm check-ins
+
+Unlike the other two services this one uses Foursquare's API, not a browser,
+so it needs a token once and then runs on its own every day.
+
+**What is saved**
+
+| File | One row per | Fields |
+|---|---|---|
+| `backups/foursquare_checkins.json/.csv` | check-in (`checkin_id`) | place, category, neighbourhood, city, province/state, country, address, coordinates, your comment, friends you tagged, date and time at the place, photo URLs, backup markers |
+| `backups/foursquare_places.json/.csv` | place (`venue_id`) | name, category, location, number of check-ins, first and last visit |
+| `backups/foursquare_profile.json` | — | name, join date and counters (mayorships, tips and so on when Foursquare still reports them; the rest are counted from your check-ins) |
+
+**One-time setup**
+
+1. Create a free project at <https://foursquare.com/developers>. In its OAuth
+   settings add the redirect URL `https://localhost/`; note the Client ID and
+   Client Secret.
+2. Run `python scripts/foursquare_token.py` on your own computer and follow
+   the prompts. It prints a token and saves nothing.
+3. Add the token as the GitHub repository secret **`FOURSQUARE_TOKEN`**.
+4. Put your profile link in the `foursquare` section of `targets.json`.
+5. Actions → Daily backup → Run workflow with *full* ticked. That walks your
+   whole history; daily runs afterwards read only what is new.
+
+`FOURSQUARE_TOKEN=… python scripts/foursquare_probe.py` lists which Foursquare
+endpoints still answer for your account. It prints field names only, never
+your check-ins or the token.
+
+**Foursquare's own data export** (Foursquare → Settings → request your data):
+drop the unzipped folder at `backups/foursquare_export/`, or the file as
+`backups/foursquare_export.zip` (`imports/` works too). Every run merges its
+`checkins*.json` files in: check-ins the API didn't return are added, and for
+ones already backed up only empty fields are filled, so the API's values are
+never overwritten. The export stays where you put it as the raw copy, and it
+is not published on the site. Leave photo folders out of the repo; photos are
+fetched by link into the private bucket instead.
+
+**The Swarm tab** has a profile card (check-ins, places, mayorships, coins,
+stickers, tips, photos, countries, cities, longest streak; a counter Foursquare
+doesn't report is left out), a searchable list (place, category, where, your
+comment, who you were with, your photos), and a *Timeline* card that starts
+closed: check-ins by year, a world map with heat spots that turns into one dot
+per place as you zoom in, rankings by country, province/state and city (tap
+one to filter), and a sortable table of every place visited.
+
+**Privacy.** This is a location diary, so it is treated more strictly than the
+rest:
+
+- The check-in files are served only after the Worker has verified a
+  Cloudflare Access token, like photos. Without Access set up the tab stays
+  empty rather than public.
+- Likes and other people's comments are never stored. Friends you tagged are.
+- Photos are re-encoded without EXIF or GPS data and kept only in the private
+  bucket.
+- The map loads its street tiles from OpenStreetMap, and only once you open
+  Timeline. OpenStreetMap's servers then see which map areas you look at and
+  this site's address, not your check-ins.
+- **Keep your copy of this repo private once it holds `backups/foursquare_*`.**
+  Those files say where you have been and when.
+
+**If it stops working:** a rejected token turns the run red and the site shows
+"last run failed" with the date of the last good copy; make a new token and
+update the secret. If the run log warns that Foursquare reports more check-ins
+than are stored, run once with *full* ticked or add the data export.
+
 ## Files
 
 | Path | What it is |
@@ -201,17 +276,20 @@ git fetch origin main && git show FETCH_HEAD:scripts/codespace_resync.sh | bash
 | `backups/imdb_ratings.json/.csv` | one row per rated title |
 | `backups/untappd_checkins.json/.csv` | one row per check-in |
 | `backups/untappd_beers.json/.csv` | one row per unique beer |
+| `backups/foursquare_*.json/.csv` | Swarm check-ins, places and profile |
 | `backups/status.json` | last success / error per service, shown on the site |
-| `scraper/` | `run_all.py` (entry point), `imdb.py`, `untappd.py`, `photos.py`, `normalize_exports.py`, `common.py` |
-| `site/index.html` | the whole website |
-| `worker/index.js` | serves private images behind Cloudflare Access |
-| `scripts/` | Codespace helpers for the Untappd backfill |
+| `scraper/` | `run_all.py` (entry point), `imdb.py`, `untappd.py`, `foursquare.py`, `photos.py`, `normalize_exports.py`, `common.py` |
+| `site/index.html` | the whole website (`site/vendor/` holds the Leaflet map library) |
+| `worker/index.js` | serves private images and Swarm data behind Cloudflare Access |
+| `scripts/` | Codespace helpers for the Untappd backfill; Foursquare token and probe scripts |
 | `tests/` | offline end-to-end tests against fixture pages |
 
 ## Configuration
 
 | Setting | Where | Default |
 |---|---|---|
+| `FOURSQUARE_TOKEN` | GitHub secret | Swarm backup skipped when missing |
+| `FSQ_PHOTOS_PER_RUN` | env | `600` Swarm photos copied per run |
 | `BACKUP_TZ` | env / repo variable | `UTC`: day used for check-in dates |
 | `IMDB_DETAILS_PER_RUN` | env | `60` titles looked up per run for missing director/runtime |
 | `UNTAPPD_DETAILS_PER_RUN` | env | `120` check-in pages read per run for flavour tags |

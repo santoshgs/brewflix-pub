@@ -13,5 +13,11 @@
     "pagination": "Click '.more_checkins' ('Show More' button) or XHR endpoint /v4/profile/checkins",
     "fields": ["checkin_id", "beer_name", "brewery_name", "style", "abv", "ibu", "user_rating", "global_rating", "checkin_date", "serving_type", "photo_url"],
     "output_base": "backups/untappd_checkins"
+  },
+  "foursquare": {
+    "profile_url": "YOUR_FOURSQUARE_PROFILE_URL",
+    "api_base": "https://api.foursquare.com/v2",
+    "api_version": "20260101",
+    "output_base": "backups/foursquare_checkins"
   }
 }

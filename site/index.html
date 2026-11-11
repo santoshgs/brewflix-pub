@@ -9,13 +9,13 @@
 :root{
   --bg:#f6f4ef;--panel:#fffdf8;--ink:#1d1b16;--muted:#6d675c;--line:#e3ded2;
   --imdb:#c99a06;--beer:#b4560f;--ok:#2f7d4f;--bad:#b3261e;--chip:#efe9dc;
-  --on-imdb:#1d1b16;--on-beer:#fffdf8;
+  --on-imdb:#1d1b16;--on-beer:#fffdf8;--fsq:#b8235a;--on-fsq:#fffdf8;
 }
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
   --bg:#15140f;--panel:#1d1c16;--ink:#ece7da;--muted:#a39d8f;--line:#33312a;
-  --imdb:#f2c230;--beer:#f08a3c;--ok:#6cc790;--bad:#ff8a80;--chip:#2a2821;--on-imdb:#15140f;--on-beer:#15140f;color-scheme:dark}}
+  --imdb:#f2c230;--beer:#f08a3c;--ok:#6cc790;--bad:#ff8a80;--chip:#2a2821;--on-imdb:#15140f;--on-beer:#15140f;--fsq:#ff8fb3;--on-fsq:#15140f;color-scheme:dark}}
 :root[data-theme="dark"]{--bg:#15140f;--panel:#1d1c16;--ink:#ece7da;--muted:#a39d8f;--line:#33312a;
-  --imdb:#f2c230;--beer:#f08a3c;--ok:#6cc790;--bad:#ff8a80;--chip:#2a2821;--on-imdb:#15140f;--on-beer:#15140f;color-scheme:dark}
+  --imdb:#f2c230;--beer:#f08a3c;--ok:#6cc790;--bad:#ff8a80;--chip:#2a2821;--on-imdb:#15140f;--on-beer:#15140f;--fsq:#ff8fb3;--on-fsq:#15140f;color-scheme:dark}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif}
 .wrap{max-width:1100px;margin:0 auto;padding:24px 16px 64px}
@@ -59,8 +59,9 @@ td a{color:inherit}
 .thumb img{display:block;width:100%;height:100%;object-fit:cover}
 .thumb.poster{width:40px;height:60px;border-radius:4px}
 .thumb.label{width:44px;height:44px;border-radius:50%}
+.thumb.venue{width:44px;height:44px;border-radius:8px}
 .comm{color:var(--muted);font-weight:600}
-@media (max-width:640px){th,td{padding:8px 6px} .thumb.poster{width:34px;height:51px} .thumb.label{width:36px;height:36px}}
+@media (max-width:640px){th,td{padding:8px 6px} .thumb.poster{width:34px;height:51px} .thumb.label{width:36px;height:36px} .thumb.venue{width:36px;height:36px}}
 .more{display:block;margin:12px auto 0;padding:8px 16px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink);font:inherit;cursor:pointer}
 .empty{padding:32px;text-align:center;color:var(--muted)}
 /* flavours + photo on check-ins */
@@ -72,6 +73,39 @@ td a{color:inherit}
 .lightbox{position:fixed;inset:0;z-index:50;background:rgba(10,9,6,.86);display:flex;align-items:center;justify-content:center;
   padding:max(16px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) max(16px,env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left));cursor:zoom-out}
 .lightbox img{max-width:100%;max-height:100%;border-radius:8px}
+.lightbox .cnt{position:absolute;left:0;right:0;bottom:max(14px,env(safe-area-inset-bottom));text-align:center;color:#fffdf8;font-size:13px}
+.photo{position:relative}
+.photo .more-n{position:absolute;right:2px;bottom:2px;background:rgba(10,9,6,.75);color:#fffdf8;font-size:10px;line-height:1;padding:2px 4px;border-radius:4px}
+.shout{font-size:13px;margin-top:3px}
+/* Swarm profile card */
+.prof{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px;margin-bottom:16px}
+.prof .who{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+.prof .av{width:56px;height:56px;border-radius:50%;background:var(--chip);overflow:hidden;flex:none;display:flex;align-items:center;justify-content:center;font:700 20px/1 Georgia,serif;color:var(--muted)}
+.prof .av img{width:100%;height:100%;object-fit:cover}
+.prof .id{flex:1 1 200px;min-width:0}
+.prof .nm{font:700 20px/1.2 Georgia,serif}
+.prof .who>a{font-size:13px;border:1px solid var(--line);border-radius:8px;padding:8px 12px;background:var(--panel);color:var(--ink);text-decoration:none}
+.prof .who>a:hover{border-color:var(--accent)}
+.ptiles{display:flex;gap:8px;overflow-x:auto;scrollbar-width:thin}
+.ptile{flex:1 0 88px;min-width:0;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px 6px;display:flex;flex-direction:column;align-items:center;gap:5px;text-align:center}
+.ptile svg{width:20px;height:20px;stroke:var(--accent);fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.ptile .n{font:700 19px/1 Georgia,serif;font-variant-numeric:tabular-nums;white-space:nowrap}
+.ptile .l{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.03em;white-space:nowrap}
+/* Swarm timeline */
+.tl h3{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:18px 0 8px;font-weight:600}
+.tl h3:first-child{margin-top:4px}
+#map{height:380px;border:1px solid var(--line);border-radius:10px;background:var(--chip);z-index:0;isolation:isolate}
+#map .leaflet-popup-content{font:13px/1.4 ui-sans-serif,system-ui,sans-serif;color:#1d1b16;margin:10px 12px}
+.rank li.b{display:block}
+.rank li.b button{all:unset;box-sizing:border-box;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px 10px;align-items:baseline;width:100%;cursor:pointer;border-radius:6px}
+.rank li.b button:focus-visible,.places th button:focus-visible,.linkish:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.linkish{all:unset;cursor:pointer;color:var(--accent);font-size:13px;font-weight:600;margin-top:8px;display:inline-block}
+.places{border:1px solid var(--line);border-radius:10px;overflow-x:auto}
+.places th button{all:unset;cursor:pointer;display:inline-flex;gap:4px;align-items:center}
+.places th button b{color:var(--accent);font-weight:400}
+.places td:first-child button{all:unset;cursor:pointer;font-weight:600}
+.places td.r,.places th.r{text-align:right}
+@media (max-width:640px){#map{height:260px}}
 /* drink statistics */
 .stats{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px;margin-bottom:12px}
 .stats h2{font:700 17px/1.2 Georgia,serif;margin:0 0 2px}
@@ -128,7 +162,7 @@ table.mini th{position:static;cursor:default}
   <header>
     <div class="intro">
       <h1>Brewflix</h1>
-      <p>Personal backup of IMDb ratings and Untappd check-ins, refreshed daily.</p>
+      <p>Personal backup of IMDb ratings, Untappd and Swarm check-ins, refreshed daily.</p>
     </div>
     <nav class="profiles" id="profiles" aria-label="Profiles" hidden></nav>
   </header>
@@ -197,6 +231,23 @@ const VIEWS = {
       [topBy(d, "brewery_name"), "top brewery"],
     ],
   },
+  swarm: {
+    label: "Swarm check-ins", file: "foursquare_checkins", accent: "--fsq", sort: "created_ts", stats: "timeline", profile: true,
+    cols: [
+      ["venue_name", "Place", r => withThumb(venueThumb(r), "venue",
+        `<a href="${esc(r.checkin_url || "#")}" target="_blank" rel="noopener noreferrer">${esc(r.venue_name || "Unnamed place")}</a>`
+        + (r.category ? `<div class="sub">${esc(r.category)}</div>` : "")
+        + (whereOf(r) ? `<div class="sub">${esc(whereOf(r))}</div>` : "")
+        + `<div class="sub sm-only">${esc(shortDay(r.checkin_date))}</div>`
+        + (r.shout ? `<div class="shout">“${esc(r.shout)}”</div>` : "")
+        + (r.with_friends ? `<div class="sub">with ${esc(r.with_friends.split(/;\s*/).join(", "))}</div>` : ""),
+        swarmPhoto(r))],
+      ["city", "Where", r => `${esc(r.city || "")}<div class="sub">${esc(r.country || "")}</div>`, "hide-sm"],
+      ["visits", "Visits", r => r.visits ? `<span class="mine">${r.visits}×</span>` : "", "num hide-sm"],
+      ["created_ts", "When", r => shortDate(r.checkin_date), "num hide-sm"],
+    ],
+    tiles: () => [],
+  },
 };
 const PAGE = 100;
 // third line under an IMDb title: "Director · 98 min"
@@ -206,7 +257,7 @@ const credits = r => { const t = [r.directors, r.runtime_mins ? `${Math.round(+r
 const poster = u => u ? u.replace(/\._V1_[^/]*\.(jpg|png)$/i, "._V1_QL75_UX92_.$1") : u;
 const withThumb = (src, kind, inner, photo) => { const t = typeof src === "object" && src ? src : { src, alt: "" };
   return `<div class="cell"><span class="thumb ${kind}">${t.src ? `<img src="${esc(t.src)}" data-alt="${esc(t.alt || "")}" alt="" loading="lazy" decoding="async" onerror="imgFallback(this)">` : ""}</span><div class="txt">${inner}</div>${photo
-  ? `<button class="photo" data-full="${esc(photo.full)}" data-full-alt="${esc(photo.fullAlt || "")}" aria-label="View check-in photo"><img src="${esc(photo.thumb)}" data-alt="${esc(photo.thumbAlt || "")}" alt="" loading="lazy" decoding="async" onerror="imgFallback(this)"></button>` : ""}</div>`; };
+  ? `<button class="photo" data-full="${esc(photo.full)}" data-full-alt="${esc(photo.fullAlt || "")}"${photo.fulls ? ` data-fulls="${esc(JSON.stringify(photo.fulls))}"` : ""} aria-label="View check-in photo${photo.fulls && photo.fulls.length > 1 ? `s (${photo.fulls.length})` : ""}">${photo.fulls && photo.fulls.length > 1 ? `<span class="more-n" aria-hidden="true">${photo.fulls.length}</span>` : ""}<img src="${esc(photo.thumb)}" data-alt="${esc(photo.thumbAlt || "")}" alt="" loading="lazy" decoding="async" onerror="imgFallback(this)"></button>` : ""}</div>`; };
 // Beer label / brewery logo: your private copy first, Untappd's as fallback.
 const labelOf = r => r.label_backup ? { src: r.label_backup, alt: r.label_url || "" } : { src: r.label_url, alt: "" };
 // Your own photo copy (private R2, behind Cloudflare Access) first; Untappd's as fallback.
@@ -216,6 +267,19 @@ const photoOf = r => {
   return r.photo_backup
     ? { thumb: `thumbs/${r.checkin_id}.webp`, thumbAlt: remoteThumb, full: `photos/${r.checkin_id}.webp`, fullAlt: remote }
     : { thumb: remoteThumb, full: remote };
+};
+// Swarm: venue photo if there is one, else the category icon (private copy first)
+const venueThumb = r => r.venue_photo_backup ? { src: r.venue_photo_backup, alt: r.category_icon_backup || r.category_icon || "" }
+  : r.category_icon_backup ? { src: r.category_icon_backup, alt: r.category_icon || "" } : { src: r.category_icon, alt: "" };
+// "Leslieville · Toronto, ON", plus the country when you were away from home
+const whereOf = r => [r.neighborhood, [r.city, r.state].filter(Boolean).join(", "), r.country && r.country !== state.home ? r.country : ""].filter(Boolean).join(" · ");
+// Your Swarm photos: private copies first, Foursquare's as fallback. photo_backup = how many are backed up.
+const swarmPhoto = r => {
+  const urls = (r.photo_urls || "").split(/\s+/).filter(Boolean); if (!urls.length) return null;
+  const done = +r.photo_backup || 0, sized = (u, size) => u.replace("/original/", `/${size}/`);
+  const fulls = urls.map((u, i) => i < done ? [`fsq-photos/${r.checkin_id}-${i + 1}.webp`, sized(u, "width960")] : [sized(u, "width960"), ""]);
+  return { thumb: done ? `fsq-thumbs/${r.checkin_id}-1.webp` : sized(urls[0], "160x160"), thumbAlt: done ? sized(urls[0], "160x160") : "",
+    full: fulls[0][0], fullAlt: fulls[0][1], fulls };
 };
 function imgFallback(img) {
   const alt = img.dataset.alt;
@@ -228,7 +292,7 @@ const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov
 const strength = r => [r.abv != null ? `${r.abv}%` : "", r.ibu != null ? `${Math.round(r.ibu)} IBU` : ""].filter(Boolean).join(" · ");
 const shortDay = iso => { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso || ""); return m ? `${+m[3]} ${MONTHS[m[2] - 1]} ${m[1]}` : ""; };
 const shortDate = iso => { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso || ""); return m ? `${+m[3]} ${MONTHS[m[2] - 1]}<div class="sub">${m[1]}</div>` : ""; };
-const state = { tab: "imdb", q: "", sort: null, dir: -1, shown: PAGE, data: {} };
+const state = { tab: "imdb", q: "", sort: null, dir: -1, shown: PAGE, data: {}, profile: null, home: "", fsqLink: "" };
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const avg = (d, k, p = 1) => { const v = d.map(r => +r[k]).filter(x => x > 0); return v.length ? (v.reduce((a, b) => a + b, 0) / v.length).toFixed(p) : "–"; };
@@ -243,10 +307,18 @@ async function getJSON(f) {
 }
 
 async function init() {
-  const [status, ...sets] = await Promise.all([getJSON("status"), ...Object.values(VIEWS).map(v => getJSON(v.file))]);
+  const [status, profile, ...sets] = await Promise.all([getJSON("status"), getJSON("foursquare_profile"), ...Object.values(VIEWS).map(v => getJSON(v.file))]);
   Object.keys(VIEWS).forEach((k, i) => state.data[k] = sets[i]?.items || []);
+  state.profile = profile && !profile.items ? profile : null;
+  // Swarm: how often each place was visited, and which country counts as home
+  const perVenue = {}, perCountry = {};
+  for (const r of state.data.swarm) { const k = r.venue_id || r.venue_name; if (k) perVenue[k] = (perVenue[k] || 0) + 1; if (r.country) perCountry[r.country] = (perCountry[r.country] || 0) + 1; }
+  for (const r of state.data.swarm) r.visits = perVenue[r.venue_id || r.venue_name] || null;
+  state.home = Object.entries(perCountry).sort((a, b) => b[1] - a[1])[0]?.[0] || "";
+  // the Swarm tab only shows once Foursquare is set up
+  if (!state.data.swarm.length && !status?.foursquare && !status?.profiles?.foursquare) delete VIEWS.swarm;
   const pills = [];
-  for (const [svc, name] of [["imdb", "IMDb"], ["untappd", "Untappd"]]) {
+  for (const [svc, name] of [["imdb", "IMDb"], ["untappd", "Untappd"], ["foursquare", "Foursquare"]]) {
     const s = status?.[svc];
     if (!s) continue;
     pills.push(s.ok
@@ -256,8 +328,10 @@ async function init() {
   if (!pills.length) pills.push(`<span class="pill">No sync status yet</span>`);
   // links to your own profiles (from targets.json via status.json); icons are each site's own favicon
   const prof = status?.profiles || {};
-  const links = [["imdb", "IMDb", "https://www.imdb.com/favicon.ico"], ["untappd", "Untappd", "https://untappd.com/favicon.ico"]]
-    .filter(([k]) => /^https:\/\/(www\.)?(imdb|untappd)\.com\//.test(prof[k] || ""))
+  const okLink = u => /^https:\/\/((www|app)\.)?(imdb|untappd|foursquare|swarmapp)\.com\//.test(u || "");
+  state.fsqLink = okLink(prof.foursquare) ? prof.foursquare : "";
+  const links = [["imdb", "IMDb", "https://www.imdb.com/favicon.ico"], ["untappd", "Untappd", "https://untappd.com/favicon.ico"], ["foursquare", "Foursquare", "https://foursquare.com/favicon.ico"]]
+    .filter(([k]) => okLink(prof[k]))
     .map(([k, label, icon]) => `<a href="${esc(prof[k])}" target="_blank" rel="noopener noreferrer"><img src="${icon}" alt="" width="16" height="16" onerror="this.remove()">${label}</a>`);
   if (links.length) { $("#profiles").innerHTML = links.join(""); $("#profiles").hidden = false; }
   $("#status").innerHTML = pills.join("");
@@ -275,11 +349,11 @@ function render(full) {
   const all = state.data[state.tab];
   if (full) {
     $("#view").innerHTML = `
-      <div class="tiles">${v.tiles(all).map(([n, l]) => `<div class="tile"><div class="n">${n}</div><div class="l">${l}</div></div>`).join("")}</div>
+      ${v.profile ? profileCard(all) : `<div class="tiles">${v.tiles(all).map(([n, l]) => `<div class="tile"><div class="n">${n}</div><div class="l">${l}</div></div>`).join("")}</div>`}
       <div class="bar"><input id="q" type="search" placeholder="Search ${v.label.toLowerCase()}…" aria-label="Search">
         <span class="count" id="count"></span>
         <a href="data/${v.file}.csv" download>CSV</a><a href="data/${v.file}.json" download>JSON</a></div>
-      ${v.stats ? `<section class="stats" id="stats" aria-label="${v.stats === "imdb" ? "Insights" : "Drink statistics"}"></section>` : ""}
+      ${v.stats ? `<section class="stats" id="stats" aria-label="${{ imdb: "Insights", timeline: "Timeline" }[v.stats] || "Drink statistics"}"></section>` : ""}
       <div class="tbl" id="tbl"></div>`;
     $("#q").oninput = e => { state.q = e.target.value.toLowerCase(); state.shown = PAGE; render(false); };
   }
@@ -290,6 +364,7 @@ function render(full) {
   $("#count").textContent = `${rows.length} of ${all.length}`;
   if (v.stats === "drink") renderStats(rows, all.length);
   if (v.stats === "imdb") renderImdbInsights(rows, all.length);
+  if (v.stats === "timeline") renderTimeline(rows, all.length);
   if (!all.length) { $("#tbl").innerHTML = `<div class="empty">No data yet — the first backup run will fill this in.</div>`; return; }
   $("#tbl").innerHTML = `<table><thead><tr>${v.cols.map(([k, l, , c]) =>
       `<th data-k="${k}" class="${c || ""}" ${k === key ? `data-dir="${state.dir > 0 ? "▲" : "▼"}"` : ""}>${l}</th>`).join("")}</tr></thead>
@@ -323,7 +398,7 @@ function groups(rows, dim) {
 }
 
 // Collapsible stats cards (closed by default; remembered while the page is open)
-const statsOpen = { drink: false, imdb: false };
+const statsOpen = { drink: false, imdb: false, timeline: false };
 function cardHead(el, kind, title, note, rerender) {
   const open = statsOpen[kind];
   el.classList.toggle("closed", !open);
@@ -489,13 +564,193 @@ function renderImdbInsights(rows, total) {
   svg.addEventListener("pointermove", show); svg.addEventListener("pointerdown", show); svg.addEventListener("pointerleave", () => tip.hidden = true);
 }
 
+// ---------- Swarm: profile card ----------
+const ICONS = {
+  checkins: "M12 21s-6-6-6-11a6 6 0 0 1 12 0c0 5-6 11-6 11z M9.5 10l2 2 3.5-3.5",
+  places: "M9 4L3 6v14l6-2 6 2 6-2V4l-6 2-6-2z M9 4v14 M15 6v14",
+  mayorships: "M4 19h16 M4 19L3 8l5 4 4-7 4 7 5-4-1 11",
+  coins: "M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18z M12 7v10 M14.5 9.8c-.5-1-1.4-1.6-2.5-1.6-1.5 0-2.5.8-2.5 1.9s1 1.6 2.5 1.9 2.5.8 2.5 1.9-1 1.9-2.5 1.9c-1.1 0-2-.6-2.5-1.6",
+  stickers: "M12 3l2.7 5.6 6.1.8-4.5 4.3 1.1 6.1L12 16.9 6.6 19.8l1.1-6.1L3.2 9.4l6.1-.8L12 3z",
+  tips: "M4 5h16v11H9l-5 4V5z M8 9h8 M8 12h5",
+  photos: "M4 7h3l2-2h6l2 2h3v12H4z M12 16a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7z",
+  countries: "M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18z M3 12h18 M12 3c3 3 3 15 0 18 M12 3c-3 3-3 15 0 18",
+  cities: "M4 21V9l6-3v15 M10 21V3l10 4v14 M3 21h18 M14 10h2 M14 14h2",
+  streak: "M12 21c-4 0-6-2.5-6-6 0-3 2-4.5 3-7 1 1 1.5 2 1.5 3 1-2 1.5-5 1-8 4 2 6.5 6 6.5 11 0 4-2 7-6 7z",
+};
+function longestStreak(days) {
+  let best = 0, run = 0, prev = null;
+  for (const d of [...days].sort()) { const t = Date.parse(d + "T00:00:00Z"); run = prev != null && t - prev === 864e5 ? run + 1 : 1; best = Math.max(best, run); prev = t; }
+  return best;
+}
+function profileCard(all) {
+  const p = state.profile || {}, st = p.stats || {};
+  const api = k => st[k] && st[k].source === "api" && st[k].value != null ? st[k].value : null;   // only what Foursquare itself reported
+  const streak = longestStreak(new Set(all.map(r => r.checkin_date).filter(Boolean)));
+  const tiles = [
+    ["checkins", "Check-ins", all.length || api("checkins")],
+    ["places", "Places", new Set(all.map(r => r.venue_id || r.venue_name).filter(Boolean)).size],
+    ["mayorships", "Mayorships", api("mayorships")], ["coins", "Coins", api("coins")], ["stickers", "Stickers", api("stickers")], ["tips", "Tips", api("tips")],
+    ["photos", "Photos", all.reduce((n, r) => n + (+r.photo_count || 0), 0)],
+    ["countries", "Countries", new Set(all.map(r => r.country).filter(Boolean)).size],
+    ["cities", "Cities", new Set(all.filter(r => r.city).map(r => [r.city, r.state, r.cc].join("|"))).size],
+    ["streak", "Streak", streak ? `${streak} d` : null],
+  ].filter(t => t[2] != null && t[2] !== 0);
+  const first = all.reduce((m, r) => r.checkin_date && (!m || r.checkin_date < m) ? r.checkin_date : m, ""), last = all.reduce((m, r) => r.checkin_date > m ? r.checkin_date : m, "");
+  const since = (p.joined || first || "").slice(0, 4);
+  const line = [since ? `Checking in since ${since}` : "", p.home_city, last ? `last check-in ${shortDay(last)}` : ""].filter(Boolean).map(esc).join(" · ");
+  const name = p.name || "Swarm";
+  const av = p.avatar_backup || p.avatar_url;
+  return `<section class="prof" aria-label="Profile"><div class="who">
+      <div class="av">${av ? `<img src="${esc(av)}" data-alt="${esc(p.avatar_backup ? p.avatar_url || "" : "")}" alt="" onerror="imgFallback(this)">` : esc(name.split(/\s+/).map(w => w[0]).join("").slice(0, 2).toUpperCase())}</div>
+      <div class="id"><div class="nm">${esc(name)}</div><div class="sub">${line}</div></div>
+      ${state.fsqLink ? `<a href="${esc(state.fsqLink)}" target="_blank" rel="noopener noreferrer">Open profile on Foursquare</a>` : ""}</div>
+    <div class="ptiles">${tiles.map(([k, l, n]) => `<div class="ptile"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="${ICONS[k]}"/></svg><div class="n">${typeof n === "number" ? n.toLocaleString("en-US") : esc(n)}</div><div class="l">${l}</div></div>`).join("")}</div>
+  </section>`;
+}
+
+// ---------- Swarm: Timeline (years, map, geography, places) ----------
+const GEO = {
+  country: ["Countries", r => r.country ? [r.country, r.country, ""] : null],
+  state: ["Provinces & states", r => r.state ? [`${r.state}|${r.cc || r.country}`, r.state, r.country || ""] : null],
+  city: ["Cities", r => r.city ? [`${r.city}|${r.state}|${r.cc || r.country}`, r.city, [r.state, r.country].filter(Boolean).join(", ")] : null],
+};
+let tlGeo = "country", tlGeoAll = false, placeSort = { k: "n", dir: -1 }, placeShown = 50, mapState = null;
+
+function placeAgg(rows) {
+  const g = new Map();
+  for (const r of rows) {
+    const k = r.venue_id || r.venue_name; if (!k) continue;
+    let p = g.get(k);
+    if (!p) g.set(k, p = { name: r.venue_name || "Unnamed place", category: r.category || "", city: r.city || "", state: r.state || "", country: r.country || "", lat: r.lat, lng: r.lng, n: 0, first: r.checkin_date || "", last: r.checkin_date || "" });
+    p.n++;
+    if (r.checkin_date && (!p.first || r.checkin_date < p.first)) p.first = r.checkin_date;
+    if (r.checkin_date && r.checkin_date > p.last) p.last = r.checkin_date;
+    if (p.lat == null && r.lat != null) { p.lat = r.lat; p.lng = r.lng; }
+  }
+  return [...g.values()];
+}
+
+function renderTimeline(rows, total) {
+  const el = $("#stats"); if (!el) return;
+  const places = placeAgg(rows);
+  const scope = rows.length === total ? `All ${total} check-ins` : `${rows.length} matching check-ins`;
+  const card = cardHead(el, "timeline", "Timeline", statsOpen.timeline ? `${scope} · ${places.length} places · follows the search box`
+    : `${scope} · world map, places visited, countries, provinces/states and cities`, () => renderTimeline(rows, total));
+  if (!card.open) { el.innerHTML = card.head; card.bind(); return; }
+  // geography ranking
+  const g = new Map();
+  for (const r of rows) { const k = GEO[tlGeo][1](r); if (!k) continue; const e = g.get(k[0]) || { name: k[1], sub: k[2], n: 0, places: new Set() }; e.n++; e.places.add(r.venue_id || r.venue_name); g.set(k[0], e); }
+  const geoAll = [...g.values()].sort((a, b) => b.n - a.n), geo = tlGeoAll ? geoAll : geoAll.slice(0, 8), maxN = Math.max(1, ...geo.map(x => x.n));
+  // places table
+  const cmp = (a, b) => { const x = a[placeSort.k], y = b[placeSort.k]; return (typeof x === "number" ? x - y : String(x).localeCompare(String(y))) * placeSort.dir || b.n - a.n; };
+  const sorted = places.slice().sort(cmp);
+  const cols = [["name", "Place", ""], ["category", "Category", "hide-sm"], ["city", "City", "hide-sm"], ["n", "Check-ins", "r"], ["first", "First", "r hide-sm"], ["last", "Last", "r hide-sm"]];
+  const my = iso => { const m = /^(\d{4})-(\d{2})/.exec(iso || ""); return m ? `${MONTHS[m[2] - 1]} ${m[1]}` : ""; };
+  el.innerHTML = `${card.head}<div id="stats-body" class="tl">
+    <h3>Check-ins by year</h3><div class="bars" id="years"></div>
+    <h3>Where you have checked in</h3>
+    <p class="note">Brighter means more check-ins · zoom in to see each place · tap a dot for details</p><div id="mapslot"></div>
+    <h3>Countries, provinces/states and cities</h3>
+    <div class="seg" role="group" aria-label="Geography level">${Object.entries(GEO).map(([k, v]) => `<button type="button" data-g="${k}" aria-pressed="${k === tlGeo}">${v[0]}</button>`).join("")}</div>
+    <ol class="rank" id="geo">${geo.length ? geo.map(x => `<li class="b"><button type="button" data-q="${esc(x.name)}" title="Show only ${esc(x.name)}">
+      <span class="nm">${esc(x.name)}<small>${esc([x.sub, `${x.places.size} place${x.places.size === 1 ? "" : "s"}`].filter(Boolean).join(" · "))}</small></span><span class="v">${x.n.toLocaleString("en-US")}</span>
+      <span class="trk"><i style="width:${(x.n / maxN * 100).toFixed(1)}%"></i></span></button></li>`).join("") : `<li><span class="nm" style="color:var(--muted)">No location details in this selection.</span></li>`}</ol>
+    ${geoAll.length > 8 ? `<button type="button" class="linkish" id="geoall">${tlGeoAll ? "Show top 8" : `Show all ${geoAll.length}`}</button>` : ""}
+    <h3>Places visited</h3>
+    <div class="places"><table class="mini"><thead><tr>${cols.map(([k, l, c]) => `<th class="${c}"${k === placeSort.k ? ` aria-sort="${placeSort.dir > 0 ? "ascending" : "descending"}"` : ""}><button type="button" data-k="${k}">${l}${k === placeSort.k ? `<b aria-hidden="true">${placeSort.dir > 0 ? "▲" : "▼"}</b>` : ""}</button></th>`).join("")}</tr></thead>
+      <tbody>${sorted.slice(0, placeShown).map(p => `<tr><td><button type="button" data-q="${esc(p.name)}" title="Show check-ins here">${esc(p.name)}</button></td><td class="hide-sm">${esc(p.category)}</td><td class="hide-sm">${esc([p.city, p.state].filter(Boolean).join(", "))}</td><td class="r mine">${p.n}</td><td class="r hide-sm">${my(p.first)}</td><td class="r hide-sm">${my(p.last)}</td></tr>`).join("")}</tbody></table></div>
+    ${sorted.length > placeShown ? `<button type="button" class="more" id="pmore">Show ${Math.min(50, sorted.length - placeShown)} more places</button>` : ""}</div>`;
+  card.bind();
+  const again = () => renderTimeline(rows, total);
+  el.querySelector(".seg").onclick = e => { const b = e.target.closest("button"); if (b) { tlGeo = b.dataset.g; tlGeoAll = false; again(); } };
+  el.querySelector("#geo").onclick = e => { const b = e.target.closest("button[data-q]"); if (b) setSearch(b.dataset.q); };
+  const ga = el.querySelector("#geoall"); if (ga) ga.onclick = () => { tlGeoAll = !tlGeoAll; again(); };
+  el.querySelector(".places thead").onclick = e => { const b = e.target.closest("button"); if (!b) return;
+    placeSort = { k: b.dataset.k, dir: placeSort.k === b.dataset.k ? -placeSort.dir : (["n", "first", "last"].includes(b.dataset.k) ? -1 : 1) }; again(); };
+  el.querySelector(".places tbody").onclick = e => { const b = e.target.closest("button[data-q]"); if (b) setSearch(b.dataset.q); };
+  const pm = el.querySelector("#pmore"); if (pm) pm.onclick = () => { placeShown += 50; again(); };
+  drawYears(el.querySelector("#years"), rows);
+  mountMap(el.querySelector("#mapslot"), places, state.q);
+}
+
+function drawYears(host, rows) {
+  const by = {}; for (const r of rows) { const y = +(r.checkin_date || "").slice(0, 4); if (y) by[y] = (by[y] || 0) + 1; }
+  const ys = Object.keys(by).map(Number); if (!ys.length) { host.innerHTML = `<p class="note">No dated check-ins in this selection.</p>`; return; }
+  const from = Math.min(...ys), to = Math.max(...ys), years = Array.from({ length: to - from + 1 }, (_, i) => from + i), counts = years.map(y => by[y] || 0);
+  const W = Math.max(280, host.clientWidth || 600), H = 150, m = { l: 4, r: 4, t: 18, b: 22 }, iw = W - m.l - m.r, ih = H - m.t - m.b;
+  const slot = iw / years.length, bw = Math.max(2, slot - Math.min(6, slot * .25)), max = Math.max(...counts), y = c => m.t + ih - c / max * ih, peak = counts.indexOf(max);
+  const every = Math.ceil(years.length / Math.max(1, Math.floor(iw / 44)));
+  host.innerHTML = `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="Check-ins per year from ${from} to ${to}; most in ${years[peak]} with ${max}">
+    ${counts.map((c, i) => { const x = m.l + i * slot + (slot - bw) / 2, h = c ? Math.max(3, m.t + ih - y(c)) : 2, r = Math.min(4, bw / 2, h);
+      return `<path d="M${x},${m.t + ih} V${m.t + ih - h + r} q0,-${r} ${r},-${r} H${x + bw - r} q${r},0 ${r},${r} V${m.t + ih} Z" fill="var(--accent)" fill-opacity="${c ? 1 : .25}"/>`; }).join("")}
+    <text x="${m.l + peak * slot + slot / 2}" y="${y(max) - 6}" text-anchor="middle" font-size="11" font-weight="700" fill="var(--ink)">${max}</text>
+    ${years.map((yr, i) => i % every === 0 ? `<text x="${m.l + i * slot + slot / 2}" y="${H - 5}" text-anchor="middle" font-size="11" fill="var(--muted)">${every > 1 || slot < 40 ? "’" + String(yr).slice(2) : yr}</text>` : "").join("")}
+    ${years.map((_, i) => `<rect data-i="${i}" x="${m.l + i * slot}" y="0" width="${slot}" height="${m.t + ih}" fill="transparent"/>`).join("")}
+  </svg><div class="tip" hidden></div>`;
+  const svg = host.querySelector("svg"), tip = host.querySelector(".tip");
+  const show = e => { const r = e.target.closest("rect[data-i]"); if (!r) return; const i = +r.dataset.i, sx = svg.getBoundingClientRect().width / W;
+    tip.hidden = false; tip.style.left = `${Math.min(Math.max((m.l + i * slot + slot / 2) * sx, 70), svg.getBoundingClientRect().width - 70)}px`;
+    tip.style.top = `${Math.max(y(counts[i]), m.t) * sx}px`; tip.textContent = `${years[i]} — ${counts[i]} check-in${counts[i] === 1 ? "" : "s"}`; };
+  svg.addEventListener("pointermove", show); svg.addEventListener("pointerdown", show); svg.addEventListener("pointerleave", () => tip.hidden = true);
+}
+
+// The map library (Leaflet, in site/vendor/) and the street tiles load only once Timeline is opened.
+function loadLeaflet() {
+  return new Promise((ok, bad) => {
+    const css = document.createElement("link"); css.rel = "stylesheet"; css.href = "vendor/leaflet.css"; document.head.appendChild(css);
+    const add = (src, next) => { const s = document.createElement("script"); s.src = src; s.onload = next; s.onerror = bad; document.head.appendChild(s); };
+    add("vendor/leaflet.js", () => add("vendor/leaflet-heat.js", ok));
+  });
+}
+function mountMap(slot, places, fitKey) {
+  if (!mapState) {
+    const el = document.createElement("div"); el.id = "map";
+    mapState = { el, ready: false, pending: null, fit: null };
+    loadLeaflet().then(() => {
+      const map = L.map(el, { preferCanvas: true, worldCopyJump: true, minZoom: 1 }).setView([25, 0], 2);
+      L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, referrerPolicy: "strict-origin-when-cross-origin",
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors' }).addTo(map);
+      Object.assign(mapState, { map, dots: L.layerGroup(), heat: null, ready: true });
+      map.on("zoomend", syncMapLayers);
+      drawMap(mapState.pending);
+    }).catch(() => { el.innerHTML = `<p class="note" style="padding:12px">The map couldn't be loaded.</p>`; });
+  }
+  slot.appendChild(mapState.el);
+  mapState.pending = { places, fitKey };
+  if (mapState.ready) drawMap(mapState.pending);
+}
+// world view: heat spots; from city level in: one dot per place
+function syncMapLayers() {
+  const { map, heat, dots } = mapState, close = map.getZoom() >= 11;
+  if (close) { heat && map.removeLayer(heat); map.addLayer(dots); } else { map.removeLayer(dots); heat && map.addLayer(heat); }
+}
+function drawMap({ places, fitKey }) {
+  const { map, dots } = mapState, pts = places.filter(p => p.lat != null && p.lng != null);
+  const accent = getComputedStyle(document.documentElement).getPropertyValue("--fsq").trim() || "#b8235a";
+  if (mapState.heat) map.removeLayer(mapState.heat);
+  const max = Math.max(1, ...pts.map(p => p.n));
+  mapState.heat = L.heatLayer(pts.map(p => [p.lat, p.lng, .4 + .6 * Math.log(1 + p.n) / Math.log(1 + max)]),
+    { radius: 16, blur: 14, minOpacity: .35, maxZoom: 5, gradient: { .35: "#f3a9c2", .7: "#d6336c", 1: "#8a1040" } });
+  dots.clearLayers();
+  for (const p of pts) L.circleMarker([p.lat, p.lng], { radius: Math.min(16, 4 + Math.sqrt(p.n)), color: accent, weight: 1, fillColor: accent, fillOpacity: .55 })
+    .bindPopup(`<b>${esc(p.name)}</b><br>${esc([p.category, p.city].filter(Boolean).join(" · "))}<br><b>${p.n} check-in${p.n === 1 ? "" : "s"}</b> · last ${esc(shortDay(p.last))}`).addTo(dots);
+  map.invalidateSize();
+  if (pts.length && mapState.fit !== fitKey) { mapState.fit = fitKey; map.fitBounds(L.latLngBounds(pts.map(p => [p.lat, p.lng])).pad(.12), { maxZoom: 14 }); }
+  syncMapLayers();
+}
+
 // photo lightbox
 document.addEventListener("click", e => {
   const b = e.target.closest(".photo"); if (!b) return;
   const lb = document.createElement("div"); lb.className = "lightbox"; lb.setAttribute("role", "dialog"); lb.setAttribute("aria-label", "Check-in photo");
-  lb.innerHTML = `<img src="${esc(b.dataset.full)}" alt="Check-in photo">`;
-  const big = lb.querySelector("img");
-  big.onerror = () => { const alt = b.dataset.fullAlt; if (alt && big.src.indexOf(alt) < 0) big.src = alt; };
+  const list = b.dataset.fulls ? JSON.parse(b.dataset.fulls) : [[b.dataset.full, b.dataset.fullAlt || ""]];
+  let at = 0;
+  lb.innerHTML = `<img alt="Check-in photo"><div class="cnt" aria-live="polite"></div>`;
+  const big = lb.querySelector("img"), cnt = lb.querySelector(".cnt");
+  const show = () => { big.dataset.alt = list[at][1] || ""; big.src = list[at][0]; cnt.textContent = list.length > 1 ? `${at + 1} of ${list.length} · tap the photo for the next one` : ""; };
+  big.onerror = () => { const alt = big.dataset.alt; if (alt) { big.dataset.alt = ""; big.src = alt; } };
+  big.onclick = ev => { if (list.length > 1) { ev.stopPropagation(); at = (at + 1) % list.length; show(); } };
+  show();
   const close = () => { lb.remove(); document.removeEventListener("keydown", onKey); };
   const onKey = ev => { if (ev.key === "Escape") close(); };
   lb.onclick = close; document.addEventListener("keydown", onKey); document.body.appendChild(lb);

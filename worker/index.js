@@ -1,6 +1,8 @@
 // Brewflix Worker: the site itself is static assets (site/). This script only
-// runs for /photos/*, /thumbs/* and /labels/* (see run_worker_first in
-// wrangler.jsonc) and serves your backed-up images from the private R2 bucket.
+// runs for the image paths and the Swarm data files listed under
+// run_worker_first in wrangler.jsonc. It serves your backed-up images from the
+// private R2 bucket, and the Swarm check-in files (a location diary) from the
+// static assets, both only after checking the visitor's Cloudflare Access token.
 //
 // Photos are served only to requests carrying a valid Cloudflare Access token
 // for this app, so they stay private even though the code is public. It fails
@@ -8,16 +10,30 @@
 // no photo is ever served and the site falls back to Untappd's own image.
 
 const PHOTO = /^\/(?:(photos|thumbs)\/(\d{1,20})|(labels)\/([0-9a-f]{16}))\.webp$/;
+// Swarm images: check-in photos and thumbnails, venue photos, category icons
+const SWARM = /^\/(?:fsq-(?:photos|thumbs)\/[0-9a-f]{24}-\d{1,2}|fsq-venues\/[0-9a-f]{24}|fsq-cats\/[0-9a-z]{1,32})\.webp$/;
+// Swarm data files: where you have been, so they get the same check as photos
+const SWARM_DATA = /^\/data\/foursquare_[a-z]+\.(?:json|csv)$/;
 let jwks = { keys: null, fetched: 0 };
 
 export default {
   async fetch(request, env) {
-    const m = PHOTO.exec(new URL(request.url).pathname);
-    if (!m) return text(404, "Not found");
+    const path = new URL(request.url).pathname;
+    if (SWARM_DATA.test(path)) {
+      if (!(await accessAllowed(request, env))) return text(403, "Sign in through Cloudflare Access to view Swarm check-ins");
+      const res = await env.ASSETS.fetch(request);
+      const out = new Response(res.body, res);
+      out.headers.set("cache-control", "private, no-cache");
+      out.headers.set("x-robots-tag", "noindex");
+      return out;
+    }
+    const m = PHOTO.exec(path);
+    const swarm = !m && SWARM.test(path);
+    if (!m && !swarm) return text(404, "Not found");
     if (!env.PHOTOS) return text(404, "Photo backup isn't set up");
     if (!(await accessAllowed(request, env))) return text(403, "Sign in through Cloudflare Access to view photos");
 
-    const obj = await env.PHOTOS.get(m[1] ? `${m[1]}/${m[2]}.webp` : `${m[3]}/${m[4]}.webp`);
+    const obj = await env.PHOTOS.get(swarm ? path.slice(1) : m[1] ? `${m[1]}/${m[2]}.webp` : `${m[3]}/${m[4]}.webp`);
     if (!obj) return text(404, "Not found");
     return new Response(obj.body, {
       headers: {

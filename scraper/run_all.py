@@ -18,11 +18,18 @@ import sys
 import traceback
 
 from common import DATA_ROOT, ROOT, TARGETS, now_iso, log
+import foursquare
 import imdb
 import normalize_exports
 import untappd
 
-SERVICES = {"imdb": imdb.run, "untappd": untappd.run}
+SERVICES = {"imdb": imdb.run, "untappd": untappd.run, "foursquare": foursquare.run}
+BACKUP_FILE = {"imdb": "imdb_ratings", "untappd": "untappd_checkins", "foursquare": "foursquare_checkins"}
+
+
+def set_up(name: str) -> bool:
+    """A service is on when targets.json has its section with no YOUR_… placeholders."""
+    return name in TARGETS and "YOUR_" not in json.dumps(TARGETS[name])
 
 
 def main() -> int:
@@ -32,9 +39,9 @@ def main() -> int:
     ap.add_argument("--headful", action="store_true")
     a = ap.parse_args()
 
-    configured = [n for n in SERVICES if "YOUR_" not in json.dumps(TARGETS.get(n, {}))]
+    configured = [n for n in SERVICES if set_up(n)]
     if not configured:
-        log("Nothing set up yet: put your IMDb user ID and/or Untappd username in targets.json")
+        log("Nothing set up yet: put your IMDb user ID, Untappd username and/or Foursquare profile in targets.json")
         return 0
 
     status_path = DATA_ROOT / "backups" / "status.json"
@@ -45,26 +52,32 @@ def main() -> int:
     for name, fn in SERVICES.items():
         if a.only and name != a.only:
             continue
-        if "YOUR_" in json.dumps(TARGETS.get(name, {})):
-            log(f"{name}: not set up in targets.json (still has YOUR_… placeholders); skipping")
+        if not set_up(name):
+            log(f"{name}: not set up in targets.json (missing, or still has YOUR_… placeholders); skipping")
             continue
-        has_backup = (DATA_ROOT / f"backups/{'imdb_ratings' if name == 'imdb' else 'untappd_checkins'}.json").exists()
+        has_backup = (DATA_ROOT / f"backups/{BACKUP_FILE[name]}.json").exists()
         try:
             added = fn(full=a.full or not has_backup, headful=a.headful)
+            if name == "foursquare" and foursquare.LAST_RUN.get("skipped"):
+                continue  # no token: nothing was attempted, so leave any earlier status as it is
             status[name] = {"ok": True, "last_success": now_iso(), "added_last_run": added,
                             "last_error": None}
+            if name == "foursquare":
+                status[name].update({k: foursquare.LAST_RUN.get(k) for k in ("api_count", "stored_count")})
         except Exception as e:  # keep going; record why
             traceback.print_exc()
             failed.append(name)
             status.setdefault(name, {})
             status[name].update({"ok": False, "last_attempt": now_iso(), "last_error": str(e)[:300]})
 
-    # copy your own check-in photos to the private R2 bucket (skipped without R2 secrets)
-    if (not a.only or a.only == "untappd") and "YOUR_" not in json.dumps(TARGETS["untappd"]):
+    # copy your own check-in photos (Untappd and Swarm) to the private R2 bucket (skipped without R2 secrets)
+    do_untappd = (not a.only or a.only == "untappd") and set_up("untappd")
+    do_swarm = (not a.only or a.only == "foursquare") and set_up("foursquare") and (DATA_ROOT / "backups/foursquare_checkins.json").exists()
+    if do_untappd or do_swarm:
         try:
             import photos
 
-            n = photos.backup() + photos.backup_labels()
+            n = (photos.backup() + photos.backup_labels() if do_untappd else 0) + (photos.backup_foursquare() if do_swarm else 0)
             status["photos"] = {"ok": True, "last_success": now_iso(), "added_last_run": n, "last_error": None}
         except Exception as e:
             traceback.print_exc()
@@ -79,6 +92,9 @@ def main() -> int:
     up = TARGETS.get("untappd", {}).get("profile_url", "")
     if up and "YOUR_" not in up:
         profiles["untappd"] = up
+    fp = TARGETS.get("foursquare", {}).get("profile_url", "")
+    if fp and "YOUR_" not in fp:
+        profiles["foursquare"] = fp
     status["profiles"] = profiles
 
     status["generated_at"] = now_iso()

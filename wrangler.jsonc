@@ -9,7 +9,7 @@
     "directory": "./site",
     "binding": "ASSETS",
     "not_found_handling": "404-page",
-    "run_worker_first": ["/photos/*", "/thumbs/*", "/labels/*"]
+    "run_worker_first": ["/photos/*", "/thumbs/*", "/labels/*", "/fsq-photos/*", "/fsq-thumbs/*", "/fsq-venues/*", "/fsq-cats/*", "/data/foursquare_*"]
   },
   // Private R2 bucket holding the image copies (no public access). The bucket
   // must exist before deploying; remove this line if you skip image backups.

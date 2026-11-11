@@ -42,10 +42,12 @@ jobs:
           mkdir -p .secrets
           echo "$UNTAPPD_STORAGE_STATE" | base64 -d > .secrets/untappd_state.json
 
-      - name: Back up IMDb + Untappd
+      - name: Back up IMDb + Untappd + Foursquare
         id: scrape
         continue-on-error: true
         env:
+          # optional: Foursquare/Swarm check-ins through the API (skipped if unset)
+          FOURSQUARE_TOKEN: ${{ secrets.FOURSQUARE_TOKEN }}
           # optional: private photo backup to Cloudflare R2 (skipped if unset)
           R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
           R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}

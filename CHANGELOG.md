@@ -6,6 +6,29 @@ commits (`backup: YYYY-MM-DD`) only update `backups/` and aren't listed.
 
 ## 2026-11-11
 
+### Tips and photos pop-overs, date range filter, icons on every tab
+The Tips and Photos counters on the Swarm profile card now open a pop-over:
+all the tips you wrote (newly backed up to `backups/foursquare_tips`, without
+other people's likes), and every check-in photo in one grid that opens full
+size. Both check-in tabs get From and To date boxes beside the search; the
+list, the count and the stats cards follow the range. The summary tiles on the
+IMDb, Untappd and Unique beers tabs get icons like the Swarm ones. If
+Foursquare stops returning tips, the saved ones stay and the run still passes.
+
+### Say that the "can't connect to localhost" page is the expected result
+After approving on Foursquare the browser shows a connection error for
+`localhost`, which looked like a failure. The token helper and the README now
+say this is expected and that the code to paste is in that address. The helper
+also accepts the address without `https://` and ignores the `#_=_` Foursquare
+adds to the end.
+
+### Foursquare setup without using your own computer
+The token helper is now meant for a Codespace: it saves the token straight
+into the `FOURSQUARE_TOKEN` repository secret through the GitHub CLI and only
+shows it if that isn't permitted. A new manual workflow, *Foursquare check*,
+runs the endpoint probe on GitHub with that secret. The setup steps in the
+README are rewritten to match.
+
 ### Add Foursquare / Swarm check-ins
 A third service: Swarm check-ins are backed up through Foursquare's API with
 place, category, location, your comment, tagged friends, time and photos, plus

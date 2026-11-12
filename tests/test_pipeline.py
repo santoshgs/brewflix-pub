@@ -357,6 +357,7 @@ class FsqApi:
 
     def __init__(self, total=620, max_page=250):
         self.total, self.max_page, self.reject, self.calls = total, max_page, False, []
+        self.tips, self.tips_gone = 9, False
         self.extra = []  # newer check-ins put in front of the generated ones
         api = self
 
@@ -378,6 +379,10 @@ class FsqApi:
                     items = api.extra + [fx.fsq_checkin(i) for i in range(api.total)]
                     off, lim = int(q.get("offset", 0)), min(int(q.get("limit", 20)), api.max_page)
                     return self.send(200, {"response": {"checkins": {"count": len(items), "items": items[off:off + lim]}}})
+                if u.path == "/v2/users/self/tips" and not api.tips_gone:
+                    items = [fx.fsq_tip(i) for i in range(api.tips)]
+                    off, lim = int(q.get("offset", 0)), min(int(q.get("limit", 20)), 4)
+                    return self.send(200, {"response": {"tips": {"count": len(items), "items": items[off:off + lim]}}})
                 self.send(404, {"meta": {"code": 404, "errorType": "endpoint_error"}})
 
             def send(self, code, body):
@@ -438,6 +443,17 @@ def test_foursquare_full_incremental_and_privacy():
         assert "coins" not in st and "stickers" not in st
         assert st["places"] == {"value": 45, "source": "derived"} and st["countries"]["value"] == 4
         assert foursquare.LAST_RUN == {"api_count": 620, "stored_count": 620}
+        # tips you wrote: all pages read, your words kept, other people's likes not
+        tips = load("foursquare_tips")
+        assert tips["count"] == 9 and len(csv_rows("foursquare_tips")) == 9
+        t0 = tips["items"][0]
+        assert t0["text"].startswith("Sample tip 0") and t0["venue_name"] == "Sample Place 0" and t0["city"] == "Toronto"
+        assert t0["tip_date"] == "2026-09-21" and t0["tip_url"].endswith("/item/0") and t0["photo_url"].endswith("/original/tip_0.jpg")
+        assert "Nosy" not in (TMP / "backups" / "foursquare_tips.json").read_text() and "agreeCount" not in json.dumps(tips)
+        # if Foursquare stops returning tips, the saved ones stay and the run still succeeds
+        api.tips_gone = True
+        assert foursquare.fetch_tips(delay=0) is None and load("foursquare_tips")["count"] == 9
+        api.tips_gone = False
 
         # nothing new: one page is read and the run stops
         api.calls.clear()

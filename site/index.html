@@ -37,12 +37,16 @@ header .intro{min-width:0;flex:1 1 280px}
 .tabs button[aria-selected=true]{color:var(--ink);border-color:var(--accent,var(--imdb))}
 .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:16px}
 .tile{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 14px}
+.tile svg{display:block;width:20px;height:20px;margin-bottom:8px;stroke:var(--accent);fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
 .tile .n{font:700 24px/1 Georgia,serif;font-variant-numeric:tabular-nums}
 .tile .l{color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.06em;margin-top:6px}
 .bar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px}
 .bar input{flex:1 1 220px;min-width:0;padding:9px 12px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink);font:inherit}
 .bar a{color:var(--ink);text-decoration:none;border:1px solid var(--line);border-radius:8px;padding:8px 12px;background:var(--panel);font-size:13px}
 .bar a:hover{border-color:var(--accent)}
+.bar label.dr{display:inline-flex;align-items:center;gap:6px;color:var(--muted);font-size:13px}
+.bar label.dr input{flex:0 0 auto;padding:7px 8px;font-size:13px;min-height:38px}
+.bar button.clr{font:inherit;font-size:13px;color:var(--accent);background:none;border:0;padding:8px 4px;cursor:pointer;font-weight:600}
 .count{color:var(--muted);font-size:13px}
 .tbl{background:var(--panel);border:1px solid var(--line);border-radius:10px;overflow-x:auto}
 table{border-collapse:collapse;width:100%;font-size:14px}
@@ -91,6 +95,26 @@ td a{color:inherit}
 .ptile svg{width:20px;height:20px;stroke:var(--accent);fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
 .ptile .n{font:700 19px/1 Georgia,serif;font-variant-numeric:tabular-nums;white-space:nowrap}
 .ptile .l{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.03em;white-space:nowrap}
+button.ptile{font:inherit;color:inherit;cursor:pointer}
+button.ptile:hover,button.ptile:focus-visible{border-color:var(--accent);outline:none}
+button.ptile .l::after{content:" ›";color:var(--accent)}
+/* pop-over for all tips / all photos */
+.pop{position:fixed;inset:0;z-index:40;background:rgba(10,9,6,.6);display:flex;align-items:center;justify-content:center;padding:max(12px,env(safe-area-inset-top)) 12px max(12px,env(safe-area-inset-bottom))}
+.pop .box{background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:12px;width:min(860px,100%);max-height:100%;display:flex;flex-direction:column;overflow:hidden}
+.pop header{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0;padding:12px 14px;border-bottom:1px solid var(--line)}
+.pop h2{font:700 18px/1.2 Georgia,serif;margin:0}
+.pop header small{color:var(--muted);font:400 13px/1 ui-sans-serif,system-ui,sans-serif;margin-left:8px}
+.pop .x{all:unset;box-sizing:border-box;cursor:pointer;width:40px;height:40px;display:flex;align-items:center;justify-content:center;border-radius:8px;font-size:22px;color:var(--muted)}
+.pop .x:hover,.pop .x:focus-visible{background:var(--chip);color:var(--ink)}
+.pop .body{overflow:auto;padding:14px;-webkit-overflow-scrolling:touch}
+.pgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:8px}
+.pgrid .photo{width:100%;height:auto;aspect-ratio:1;border-radius:8px}
+.tips{list-style:none;margin:0;padding:0;display:grid;gap:14px}
+.tips li{display:flex;gap:10px;align-items:flex-start;padding-bottom:14px;border-bottom:1px solid var(--line)}
+.tips li:last-child{border-bottom:0;padding-bottom:0}
+.tips .t{flex:1;min-width:0}
+.tips p{margin:0 0 4px}
+.tips a{color:var(--accent)}
 /* Swarm timeline */
 .tl h3{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:18px 0 8px;font-weight:600}
 .tl h3:first-child{margin-top:4px}
@@ -184,14 +208,14 @@ const VIEWS = {
       ["date_rated", "Rated", r => shortDate(r.date_rated), "num"],
     ],
     tiles: d => [
-      [d.length, "titles rated"],
-      [avg(d, "user_rating"), "my average"],
-      [avg(d, "imdb_rating"), "IMDb average"],
-      [d.filter(r => (r.date_rated || "").startsWith(String(new Date().getFullYear()))).length, "rated this year"],
+      [d.length, "titles rated", "film"],
+      [avg(d, "user_rating"), "my average", "stickers"],
+      [avg(d, "imdb_rating"), "IMDb average", "bars"],
+      [d.filter(r => (r.date_rated || "").startsWith(String(new Date().getFullYear()))).length, "rated this year", "calendar"],
     ],
   },
   checkins: {
-    label: "Untappd check-ins", file: "untappd_checkins", accent: "--beer", sort: "checkin_date", stats: "drink",
+    label: "Untappd check-ins", file: "untappd_checkins", accent: "--beer", sort: "checkin_date", stats: "drink", date: "checkin_date",
     cols: [
       ["beer_name", "Beer", r => withThumb(labelOf(r), "label",
         `<a href="${r.checkin_url || "#"}" target="_blank" rel="noopener">${esc(r.beer_name)}</a><div class="sub">${esc(r.brewery_name || "")}${r.style ? " · " + esc(r.style) : ""}</div>`
@@ -206,10 +230,10 @@ const VIEWS = {
       ["checkin_date", "When", r => shortDate(r.checkin_date), "num hide-sm"],
     ],
     tiles: d => [
-      [d.length, "check-ins"],
-      [new Set(d.map(r => r.beer_id || r.beer_name)).size, "distinct beers"],
-      [new Set(d.map(r => r.brewery_name)).size, "breweries"],
-      [avg(d, "user_rating", 2), "my average"],
+      [d.length, "check-ins", "mug"],
+      [new Set(d.map(r => r.beer_id || r.beer_name)).size, "distinct beers", "bottle"],
+      [new Set(d.map(r => r.brewery_name)).size, "breweries", "cities"],
+      [avg(d, "user_rating", 2), "my average", "stickers"],
     ],
   },
   beers: {
@@ -225,14 +249,14 @@ const VIEWS = {
       ["checkin_count", "Times", r => r.checkin_count ?? "", "num hide-sm"],
     ],
     tiles: d => [
-      [d.length, "unique beers"],
-      [avg(d, "abv", 1) + (d.length ? "%" : ""), "average ABV"],
-      [topBy(d, "style"), "top style"],
-      [topBy(d, "brewery_name"), "top brewery"],
+      [d.length, "unique beers", "bottle"],
+      [avg(d, "abv", 1) + (d.length ? "%" : ""), "average ABV", "percent"],
+      [topBy(d, "style"), "top style", "tag"],
+      [topBy(d, "brewery_name"), "top brewery", "cities"],
     ],
   },
   swarm: {
-    label: "Swarm check-ins", file: "foursquare_checkins", accent: "--fsq", sort: "created_ts", stats: "timeline", profile: true,
+    label: "Swarm check-ins", file: "foursquare_checkins", accent: "--fsq", sort: "created_ts", stats: "timeline", profile: true, date: "checkin_date",
     cols: [
       ["venue_name", "Place", r => withThumb(venueThumb(r), "venue",
         `<a href="${esc(r.checkin_url || "#")}" target="_blank" rel="noopener noreferrer">${esc(r.venue_name || "Unnamed place")}</a>`
@@ -292,7 +316,7 @@ const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov
 const strength = r => [r.abv != null ? `${r.abv}%` : "", r.ibu != null ? `${Math.round(r.ibu)} IBU` : ""].filter(Boolean).join(" · ");
 const shortDay = iso => { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso || ""); return m ? `${+m[3]} ${MONTHS[m[2] - 1]} ${m[1]}` : ""; };
 const shortDate = iso => { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso || ""); return m ? `${+m[3]} ${MONTHS[m[2] - 1]}<div class="sub">${m[1]}</div>` : ""; };
-const state = { tab: "imdb", q: "", sort: null, dir: -1, shown: PAGE, data: {}, profile: null, home: "", fsqLink: "" };
+const state = { tab: "imdb", q: "", sort: null, dir: -1, shown: PAGE, data: {}, profile: null, home: "", fsqLink: "", tips: [], from: "", to: "" };
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const avg = (d, k, p = 1) => { const v = d.map(r => +r[k]).filter(x => x > 0); return v.length ? (v.reduce((a, b) => a + b, 0) / v.length).toFixed(p) : "–"; };
@@ -307,9 +331,10 @@ async function getJSON(f) {
 }
 
 async function init() {
-  const [status, profile, ...sets] = await Promise.all([getJSON("status"), getJSON("foursquare_profile"), ...Object.values(VIEWS).map(v => getJSON(v.file))]);
+  const [status, profile, tips, ...sets] = await Promise.all([getJSON("status"), getJSON("foursquare_profile"), getJSON("foursquare_tips"), ...Object.values(VIEWS).map(v => getJSON(v.file))]);
   Object.keys(VIEWS).forEach((k, i) => state.data[k] = sets[i]?.items || []);
   state.profile = profile && !profile.items ? profile : null;
+  state.tips = tips?.items || [];
   // Swarm: how often each place was visited, and which country counts as home
   const perVenue = {}, perCountry = {};
   for (const r of state.data.swarm) { const k = r.venue_id || r.venue_name; if (k) perVenue[k] = (perVenue[k] || 0) + 1; if (r.country) perCountry[r.country] = (perCountry[r.country] || 0) + 1; }
@@ -337,7 +362,7 @@ async function init() {
   $("#status").innerHTML = pills.join("");
   $("#tabs").innerHTML = Object.entries(VIEWS).map(([k, v]) =>
     `<button role="tab" data-k="${k}" aria-selected="${k === state.tab}">${v.label} <span class="count">${state.data[k].length}</span></button>`).join("");
-  $("#tabs").onclick = e => { const b = e.target.closest("button"); if (b) { Object.assign(state, { tab: b.dataset.k, q: "", sort: null, dir: -1, shown: PAGE }); render(true); } };
+  $("#tabs").onclick = e => { const b = e.target.closest("button"); if (b) { Object.assign(state, { tab: b.dataset.k, q: "", from: "", to: "", sort: null, dir: -1, shown: PAGE }); render(true); } };
   render(true);
 }
 
@@ -349,16 +374,28 @@ function render(full) {
   const all = state.data[state.tab];
   if (full) {
     $("#view").innerHTML = `
-      ${v.profile ? profileCard(all) : `<div class="tiles">${v.tiles(all).map(([n, l]) => `<div class="tile"><div class="n">${n}</div><div class="l">${l}</div></div>`).join("")}</div>`}
+      ${v.profile ? profileCard(all) : `<div class="tiles">${v.tiles(all).map(([n, l, ic]) => `<div class="tile">${ICONS[ic] ? `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="${ICONS[ic]}"/></svg>` : ""}<div class="n">${n}</div><div class="l">${l}</div></div>`).join("")}</div>`}
       <div class="bar"><input id="q" type="search" placeholder="Search ${v.label.toLowerCase()}…" aria-label="Search">
+        ${v.date ? `<label class="dr">From <input type="date" id="d1"></label><label class="dr">To <input type="date" id="d2"></label><button type="button" class="clr" id="dclr" hidden>Clear dates</button>` : ""}
         <span class="count" id="count"></span>
         <a href="data/${v.file}.csv" download>CSV</a><a href="data/${v.file}.json" download>JSON</a></div>
       ${v.stats ? `<section class="stats" id="stats" aria-label="${{ imdb: "Insights", timeline: "Timeline" }[v.stats] || "Drink statistics"}"></section>` : ""}
       <div class="tbl" id="tbl"></div>`;
     $("#q").oninput = e => { state.q = e.target.value.toLowerCase(); state.shown = PAGE; render(false); };
+    if (v.date) {
+      // limit the pickers to the span of the data, and keep From ≤ To
+      const days = all.map(r => (r[v.date] || "").slice(0, 10)).filter(Boolean), lo = days.reduce((m, d) => d < m ? d : m, days[0] || ""), hi = days.reduce((m, d) => d > m ? d : m, "");
+      const d1 = $("#d1"), d2 = $("#d2");
+      for (const d of [d1, d2]) { d.min = lo; d.max = hi; }
+      const set = () => { state.from = d1.value; state.to = d2.value; if (state.from && state.to && state.from > state.to) { state.to = d2.value = state.from; } state.shown = PAGE; render(false); };
+      d1.onchange = d2.onchange = set;
+      $("#dclr").onclick = () => { d1.value = d2.value = ""; set(); };
+    }
   }
   const key = state.sort || v.sort;
   let rows = state.q ? all.filter(r => Object.values(r).some(x => String(x ?? "").toLowerCase().includes(state.q))) : all.slice();
+  if (v.date && (state.from || state.to)) rows = rows.filter(r => { const d = (r[v.date] || "").slice(0, 10); return d && (!state.from || d >= state.from) && (!state.to || d <= state.to); });
+  if (v.date && $("#dclr")) $("#dclr").hidden = !(state.from || state.to);
   rows.sort((a, b) => { const x = a[key], y = b[key]; if (x == null || x === "") return 1; if (y == null || y === "") return -1;
     return (typeof x === "number" && typeof y === "number" ? x - y : String(x).localeCompare(String(y))) * state.dir; });
   $("#count").textContent = `${rows.length} of ${all.length}`;
@@ -575,6 +612,13 @@ const ICONS = {
   photos: "M4 7h3l2-2h6l2 2h3v12H4z M12 16a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7z",
   countries: "M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18z M3 12h18 M12 3c3 3 3 15 0 18 M12 3c-3 3-3 15 0 18",
   cities: "M4 21V9l6-3v15 M10 21V3l10 4v14 M3 21h18 M14 10h2 M14 14h2",
+  film: "M4 4h16v16H4z M8 4v16 M16 4v16 M4 8h4 M4 12h4 M4 16h4 M16 8h4 M16 12h4 M16 16h4",
+  bars: "M5 20V11 M12 20V4 M19 20v-6 M3 20h18",
+  calendar: "M4 6h16v14H4z M4 10h16 M8 3v4 M16 3v4",
+  mug: "M6 8h9v12H6z M15 11h2.5a1.5 1.5 0 0 1 1.5 1.5v3a1.5 1.5 0 0 1-1.5 1.5H15 M6 8a3 3 0 0 1 4.5-2.6A3 3 0 0 1 15 8",
+  bottle: "M10 3h4v4l2 3v10a1 1 0 0 1-1 1H9a1 1 0 0 1-1-1V10l2-3V3z M8 14h8",
+  percent: "M19 5L5 19 M7.5 9a2 2 0 1 0 0-4 2 2 0 0 0 0 4z M16.5 19a2 2 0 1 0 0-4 2 2 0 0 0 0 4z",
+  tag: "M3 12V4h8l9 9-8 8-9-9z M7.5 8.5h.01",
   streak: "M12 21c-4 0-6-2.5-6-6 0-3 2-4.5 3-7 1 1 1.5 2 1.5 3 1-2 1.5-5 1-8 4 2 6.5 6 6.5 11 0 4-2 7-6 7z",
 };
 function longestStreak(days) {
@@ -589,7 +633,7 @@ function profileCard(all) {
   const tiles = [
     ["checkins", "Check-ins", all.length || api("checkins")],
     ["places", "Places", new Set(all.map(r => r.venue_id || r.venue_name).filter(Boolean)).size],
-    ["mayorships", "Mayorships", api("mayorships")], ["coins", "Coins", api("coins")], ["stickers", "Stickers", api("stickers")], ["tips", "Tips", api("tips")],
+    ["mayorships", "Mayorships", api("mayorships")], ["coins", "Coins", api("coins")], ["stickers", "Stickers", api("stickers")], ["tips", "Tips", api("tips") ?? (state.tips.length || null)],
     ["photos", "Photos", all.reduce((n, r) => n + (+r.photo_count || 0), 0)],
     ["countries", "Countries", new Set(all.map(r => r.country).filter(Boolean)).size],
     ["cities", "Cities", new Set(all.filter(r => r.city).map(r => [r.city, r.state, r.cc].join("|"))).size],
@@ -604,7 +648,8 @@ function profileCard(all) {
       <div class="av">${av ? `<img src="${esc(av)}" data-alt="${esc(p.avatar_backup ? p.avatar_url || "" : "")}" alt="" onerror="imgFallback(this)">` : esc(name.split(/\s+/).map(w => w[0]).join("").slice(0, 2).toUpperCase())}</div>
       <div class="id"><div class="nm">${esc(name)}</div><div class="sub">${line}</div></div>
       ${state.fsqLink ? `<a href="${esc(state.fsqLink)}" target="_blank" rel="noopener noreferrer">Open profile on Foursquare</a>` : ""}</div>
-    <div class="ptiles">${tiles.map(([k, l, n]) => `<div class="ptile"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="${ICONS[k]}"/></svg><div class="n">${typeof n === "number" ? n.toLocaleString("en-US") : esc(n)}</div><div class="l">${l}</div></div>`).join("")}</div>
+    <div class="ptiles">${tiles.map(([k, l, n]) => { const tag = k === "tips" || k === "photos" ? "button" : "div";
+      return `<${tag} class="ptile"${tag === "button" ? ` type="button" data-pop="${k}" aria-haspopup="dialog" title="Show all ${l.toLowerCase()}"` : ""}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="${ICONS[k]}"/></svg><span class="n">${typeof n === "number" ? n.toLocaleString("en-US") : esc(n)}</span><span class="l">${l}</span></${tag}>`; }).join("")}</div>
   </section>`;
 }
 
@@ -670,7 +715,7 @@ function renderTimeline(rows, total) {
   el.querySelector(".places tbody").onclick = e => { const b = e.target.closest("button[data-q]"); if (b) setSearch(b.dataset.q); };
   const pm = el.querySelector("#pmore"); if (pm) pm.onclick = () => { placeShown += 50; again(); };
   drawYears(el.querySelector("#years"), rows);
-  mountMap(el.querySelector("#mapslot"), places, state.q);
+  mountMap(el.querySelector("#mapslot"), places, [state.q, state.from, state.to].join("|"));
 }
 
 function drawYears(host, rows) {
@@ -739,20 +784,65 @@ function drawMap({ places, fitKey }) {
   syncMapLayers();
 }
 
+// ---------- Swarm: "all tips" and "all photos" pop-overs (opened from the profile tiles) ----------
+function openPop(title, count, bodyHtml, wire) {
+  const back = document.activeElement, pop = document.createElement("div");
+  pop.className = "pop"; pop.setAttribute("role", "dialog"); pop.setAttribute("aria-modal", "true"); pop.setAttribute("aria-label", title);
+  pop.innerHTML = `<div class="box"><header><h2>${esc(title)}<small>${esc(count)}</small></h2><button type="button" class="x" aria-label="Close">×</button></header><div class="body">${bodyHtml}</div></div>`;
+  const close = () => { pop.remove(); document.removeEventListener("keydown", onKey); document.body.style.overflow = ""; back && back.focus && back.focus(); };
+  const onKey = e => { if (e.key === "Escape" && !document.querySelector(".lightbox")) close(); };
+  pop.addEventListener("click", e => { if (e.target === pop || e.target.closest(".x")) close(); });
+  document.addEventListener("keydown", onKey); document.body.style.overflow = "hidden"; document.body.appendChild(pop);
+  pop.querySelector(".x").focus();
+  wire && wire(pop.querySelector(".body"), close);
+}
+function showTips() {
+  const tips = state.tips.slice().sort((a, b) => (b.created_ts || 0) - (a.created_ts || 0));
+  const sized = u => (u || "").replace("/original/", "/160x160/");
+  openPop("Tips", tips.length ? `${tips.length}` : "", tips.length ? `<ul class="tips">${tips.map(t => `<li>
+      ${t.photo_url ? `<button class="photo" data-full="${esc(t.photo_url.replace("/original/", "/width960/"))}" data-cap="${esc(t.venue_name || "")}" aria-label="View tip photo"><img src="${esc(sized(t.photo_url))}" alt="" loading="lazy" onerror="this.parentNode.remove()"></button>` : ""}
+      <div class="t"><p>${esc(t.text)}</p><div class="sub">${[t.venue_name ? `<b>${esc(t.venue_name)}</b>` : "", esc([t.city, t.state].filter(Boolean).join(", ")), esc(shortDay(t.tip_date)),
+        /^https:\/\//.test(t.tip_url || "") ? `<a href="${esc(t.tip_url)}" target="_blank" rel="noopener noreferrer">open on Foursquare</a>` : ""].filter(Boolean).join(" · ")}</div></div></li>`).join("")}</ul>`
+    : `<p class="note">Your tips haven't been backed up yet. They are saved by the next daily run.</p>`);
+}
+function showPhotos() {
+  const sized = (u, size) => u.replace("/original/", `/${size}/`);
+  // one tile per photo, newest check-in first; a tap opens that check-in's photos in the lightbox
+  const shots = [];
+  for (const r of state.data.swarm.slice().sort((a, b) => (b.created_ts || 0) - (a.created_ts || 0))) {
+    const p = swarmPhoto(r); if (!p) continue;
+    const urls = r.photo_urls.split(/\s+/).filter(Boolean), done = +r.photo_backup || 0, cap = [r.venue_name, shortDay(r.checkin_date)].filter(Boolean).join(" · ");
+    urls.forEach((u, i) => shots.push({ thumb: i < done ? `fsq-thumbs/${r.checkin_id}-${i + 1}.webp` : sized(u, "160x160"), alt: i < done ? sized(u, "160x160") : "", fulls: p.fulls, at: i, cap }));
+  }
+  const STEP = 120; let shown = 0;
+  openPop("Photos", shots.length ? `${shots.length.toLocaleString("en-US")}` : "", shots.length ? `<div class="pgrid"></div><button type="button" class="more" id="pg-more"></button>`
+    : `<p class="note">No check-in photos yet.</p>`, body => {
+    const grid = body.querySelector(".pgrid"), more = body.querySelector("#pg-more"); if (!grid) return;
+    const add = () => {
+      grid.insertAdjacentHTML("beforeend", shots.slice(shown, shown + STEP).map(s => `<button class="photo" data-full="${esc(s.fulls[s.at][0])}" data-fulls="${esc(JSON.stringify(s.fulls))}" data-at="${s.at}" data-cap="${esc(s.cap)}" title="${esc(s.cap)}" aria-label="Photo: ${esc(s.cap)}"><img src="${esc(s.thumb)}" data-alt="${esc(s.alt)}" alt="" loading="lazy" onerror="imgFallback(this)"></button>`).join(""));
+      shown = Math.min(shots.length, shown + STEP);
+      more.hidden = shown >= shots.length; more.textContent = `Show ${Math.min(STEP, shots.length - shown)} more of ${shots.length - shown}`;
+    };
+    more.onclick = add; add();
+  });
+}
+document.addEventListener("click", e => { const b = e.target.closest("button[data-pop]"); if (b) (b.dataset.pop === "tips" ? showTips : showPhotos)(); });
+
 // photo lightbox
 document.addEventListener("click", e => {
   const b = e.target.closest(".photo"); if (!b) return;
   const lb = document.createElement("div"); lb.className = "lightbox"; lb.setAttribute("role", "dialog"); lb.setAttribute("aria-label", "Check-in photo");
   const list = b.dataset.fulls ? JSON.parse(b.dataset.fulls) : [[b.dataset.full, b.dataset.fullAlt || ""]];
-  let at = 0;
+  let at = Math.min(+b.dataset.at || 0, list.length - 1);
+  const cap = b.dataset.cap || "";
   lb.innerHTML = `<img alt="Check-in photo"><div class="cnt" aria-live="polite"></div>`;
   const big = lb.querySelector("img"), cnt = lb.querySelector(".cnt");
-  const show = () => { big.dataset.alt = list[at][1] || ""; big.src = list[at][0]; cnt.textContent = list.length > 1 ? `${at + 1} of ${list.length} · tap the photo for the next one` : ""; };
+  const show = () => { big.dataset.alt = list[at][1] || ""; big.src = list[at][0]; cnt.textContent = [cap, list.length > 1 ? `${at + 1} of ${list.length} · tap the photo for the next one` : ""].filter(Boolean).join(" · "); };
   big.onerror = () => { const alt = big.dataset.alt; if (alt) { big.dataset.alt = ""; big.src = alt; } };
   big.onclick = ev => { if (list.length > 1) { ev.stopPropagation(); at = (at + 1) % list.length; show(); } };
   show();
   const close = () => { lb.remove(); document.removeEventListener("keydown", onKey); };
-  const onKey = ev => { if (ev.key === "Escape") close(); };
+  const onKey = ev => { if (ev.key === "Escape") { ev.stopImmediatePropagation(); close(); } };
   lb.onclick = close; document.addEventListener("keydown", onKey); document.body.appendChild(lb);
 });
 let rz; addEventListener("resize", () => { clearTimeout(rz); rz = setTimeout(() => VIEWS[state.tab].stats && render(false), 150); });

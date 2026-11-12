@@ -203,3 +203,14 @@ FSQ_USER = {"id": "1234", "firstName": "Sample", "lastName": "Person", "homeCity
             "photo": {"prefix": "https://fastly.4sqi.net/img/user/", "suffix": "/avatar.jpg"},
             "checkins": {"count": 620}, "mayorships": {"count": 3}, "tips": {"count": 11},
             "friends": {"count": 40}, "lists": {"count": 2}, "photos": {"count": 99}}
+
+
+def fsq_tip(i):
+    """Tip number i that the sample person wrote (0 is the newest)."""
+    v = fsq_checkin(i)["venue"] if i % 40 != 39 else fsq_checkin(i + 1)["venue"]
+    tip = {"id": f"{0x5200000000000000000000 + (1000 - i):024x}", "createdAt": 1790000000 - i * 86400 * 30,
+           "text": f"Sample tip {i}: ask for the corner table.", "canonicalUrl": f"https://app.foursquare.com/item/{i}",
+           "venue": v, "agreeCount": 4, "likes": {"count": 4, "groups": [{"items": [{"firstName": "Nosy", "lastName": "Neighbour"}]}]}}
+    if i % 4 == 0:
+        tip["photo"] = {"prefix": "https://fastly.4sqi.net/img/general/", "suffix": f"/tip_{i}.jpg"}
+    return tip

@@ -12,6 +12,7 @@ Writes:
   backups/foursquare_checkins.json/.csv   one row per check-in
   backups/foursquare_places.json/.csv     one row per venue, rebuilt each run
   backups/foursquare_profile.json         name, join date and counters
+  backups/foursquare_tips.json/.csv       one row per tip you wrote
 
 Unlike Untappd, places, your own comments ("shouts"), clock times and the
 friends you tagged are kept on purpose: this is a location diary. Likes and
@@ -47,6 +48,8 @@ PLACE_FIELDS = [
     "lat", "lng", "checkin_count", "first_checkin", "last_checkin", "category_icon",
     "category_icon_backup", "venue_photo_backup",
 ]
+TIP_FIELDS = ["tip_id", "created_at", "tip_date", "text", "venue_id", "venue_name", "category", "city", "state",
+              "country", "tip_url", "photo_url", "created_ts"]
 # never stored: other people's reactions and words, and API plumbing
 DROP_FIELDS = ("likes", "like", "comments", "posts", "source_app", "user", "entities", "score")
 
@@ -172,6 +175,69 @@ def checkin_store() -> Store:
 
 def place_store() -> Store:
     return Store("backups/foursquare_places", "venue_id", PLACE_FIELDS, sort_by="last_checkin")
+
+
+def tip_store() -> Store:
+    return Store("backups/foursquare_tips", "tip_id", TIP_FIELDS, sort_by="created_ts", drop=DROP_FIELDS)
+
+
+def normalise_tip(item: dict) -> dict | None:
+    """One tip you wrote -> one flat row. Other people's likes and replies are left out."""
+    tid, ts = item.get("id"), _ts(item.get("createdAt"))
+    if not tid or ts is None or not (item.get("text") or "").strip():
+        return None
+    when = datetime.fromtimestamp(ts, timezone.utc)
+    venue = item.get("venue") or {}
+    loc = venue.get("location") or {}
+    cats = venue.get("categories") or []
+    cat = next((c for c in cats if c.get("primary")), cats[0] if cats else {})
+    photo = item.get("photo") or {}
+    return {
+        "tip_id": str(tid),
+        "created_at": when.isoformat(),
+        "tip_date": when.date().isoformat(),
+        "text": item["text"].strip(),
+        "venue_id": venue.get("id"),
+        "venue_name": venue.get("name"),
+        "category": cat.get("name"),
+        "city": loc.get("city"),
+        "state": loc.get("state"),
+        "country": loc.get("country"),
+        "tip_url": item.get("canonicalUrl"),
+        "photo_url": (f"{photo['prefix']}original{photo['suffix']}" if photo.get("prefix") and photo.get("suffix")
+                      else item.get("photourl")),
+        "created_ts": ts,
+    }
+
+
+def fetch_tips(delay: float = 0.5) -> int | None:
+    """Back up every tip you wrote. There are few, so the whole list is read each run.
+
+    Returns how many are stored, or None if Foursquare wouldn't return them (the
+    check-in backup is not affected).
+    """
+    store = tip_store()
+    offset = 0
+    try:
+        while True:
+            res = api_get("users/self/tips", {"limit": 200, "offset": offset, "sort": "recent"}).get("tips") or {}
+            items = res.get("items") or []
+            if not items:
+                break
+            for it in items:
+                rec = normalise_tip(it)
+                if rec:
+                    store.upsert(rec, save_every=0)
+            offset += len(items)
+            if res.get("count") and offset >= res["count"]:
+                break
+            time.sleep(delay)
+    except ApiError as e:
+        log(f"Foursquare tips: not backed up this run ({e})")
+        return None
+    store.save()
+    log(f"Foursquare tips: {store.added} new, {len(store)} total")
+    return len(store)
 
 
 def fetch_checkins(store: Store, full: bool, delay: float = 0.5) -> dict:
@@ -386,6 +452,7 @@ def run(full: bool = False, headful: bool = False, delay: float = 0.5) -> int:
     store.save()
     rebuild_places(store)
     fetch_profile(store)
+    fetch_tips(delay=delay)
     LAST_RUN.clear()
     LAST_RUN.update(api_count=info.get("api_count"), stored_count=len(store))
     if info.get("api_count") and len(store) < info["api_count"]:

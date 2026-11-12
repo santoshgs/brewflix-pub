@@ -214,6 +214,7 @@ so it needs a token once and then runs on its own every day.
 |---|---|---|
 | `backups/foursquare_checkins.json/.csv` | check-in (`checkin_id`) | place, category, neighbourhood, city, province/state, country, address, coordinates, your comment, friends you tagged, date and time at the place, photo URLs, backup markers |
 | `backups/foursquare_places.json/.csv` | place (`venue_id`) | name, category, location, number of check-ins, first and last visit |
+| `backups/foursquare_tips.json/.csv` | tip you wrote (`tip_id`) | text, place, city, date, link, photo URL |
 | `backups/foursquare_profile.json` | — | name, join date and counters (mayorships, tips and so on when Foursquare still reports them; the rest are counted from your check-ins) |
 
 **One-time setup**
@@ -221,16 +222,22 @@ so it needs a token once and then runs on its own every day.
 1. Create a free project at <https://foursquare.com/developers>. In its OAuth
    settings add the redirect URL `https://localhost/`; note the Client ID and
    Client Secret.
-2. Run `python scripts/foursquare_token.py` on your own computer and follow
-   the prompts. It prints a token and saves nothing.
-3. Add the token as the GitHub repository secret **`FOURSQUARE_TOKEN`**.
+2. Open a Codespace on this repo (Code → Codespaces; the same one used for the
+   Untappd backfill is fine) and run `python scripts/foursquare_token.py` in
+   its terminal. Open the link it prints and approve. Your browser then says
+   it can't connect to "localhost": that is expected. Copy the address it shows
+   (`localhost/?code=…`) and paste it into the terminal. Nothing runs on your own computer; a phone browser works.
+3. The script saves the token as the repository secret **`FOURSQUARE_TOKEN`**.
+   If the Codespace isn't allowed to, it shows the token once so you can paste
+   it at Settings → Secrets and variables → Actions. Stop the Codespace after.
 4. Put your profile link in the `foursquare` section of `targets.json`.
 5. Actions → Daily backup → Run workflow with *full* ticked. That walks your
    whole history; daily runs afterwards read only what is new.
 
-`FOURSQUARE_TOKEN=… python scripts/foursquare_probe.py` lists which Foursquare
-endpoints still answer for your account. It prints field names only, never
-your check-ins or the token.
+Actions → **Foursquare check** → Run workflow lists which Foursquare endpoints
+still answer for your account (useful when a counter such as mayorships or
+coins is missing). It prints field names and counts only, never your
+check-ins or the token. In a public repo that run's log is public too.
 
 **Foursquare's own data export** (Foursquare → Settings → request your data):
 drop the unzipped folder at `backups/foursquare_export/`, or the file as
@@ -248,6 +255,11 @@ comment, who you were with, your photos), and a *Timeline* card that starts
 closed: check-ins by year, a world map with heat spots that turns into one dot
 per place as you zoom in, rankings by country, province/state and city (tap
 one to filter), and a sortable table of every place visited.
+
+Tap the **Tips** or **Photos** counter on the profile card to see all of your
+tips, or every check-in photo in one grid (tap a photo for full size). The
+**From** and **To** date boxes beside the search narrow the list, and the
+Timeline with it, to a date range; the Untappd check-ins tab has them too.
 
 **Privacy.** This is a location diary, so it is treated more strictly than the
 rest:

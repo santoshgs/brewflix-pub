@@ -45,6 +45,9 @@ paywall or disappear, your history is still yours.
   sortable list of every place you've visited.
 - Set up separately; see [Foursquare / Swarm check-ins](#foursquare--swarm-check-ins).
 
+![Swarm Check-ins](docs/screenshots/swarm-checkins.jpg)
+![Swarm Tips](docs/screenshots/swarm-tips.jpg)
+
 **Everywhere**
 - Links to your IMDb, Untappd and Foursquare profiles at the top of the page.
 - Search any tab; the stats cards follow your search (type "IPA" for IPA stats).

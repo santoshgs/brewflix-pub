@@ -104,6 +104,13 @@ def untappd_from_export(path: Path) -> int:
             "serving_type": r.get("serving_type"),
             "photo_url": r.get("photo_url"),
             "checkin_url": r.get("checkin_url"),
+            # where the beer was had; the export also knows the venue's city and coordinates
+            "venue_name": r.get("venue_name"),
+            "venue_city": r.get("venue_city"),
+            "venue_state": r.get("venue_state"),
+            "venue_country": r.get("venue_country"),
+            "venue_lat": to_float(r.get("venue_lat")),
+            "venue_lng": to_float(r.get("venue_lng")),
             "source": "export",
         }
         checkins.upsert(rec, save_every=0)

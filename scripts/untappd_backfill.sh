@@ -69,7 +69,7 @@ for f in ("backups/untappd_checkins.json", "backups/untappd_beers.json"):
     except FileNotFoundError:
         continue
     for r in items:
-        if any(k in r for k in ("comment", "venue", "venue_name", "purchase_venue")):
+        if any(k in r for k in ("comment", "purchase_venue")):
             bad.append(f"{f}: private field in {r.get('checkin_id') or r.get('beer_id')}")
         if len(str(r.get("checkin_date") or "")) > 10:
             bad.append(f"{f}: clock time in {r.get('checkin_id')}")

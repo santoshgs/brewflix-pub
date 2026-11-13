@@ -98,6 +98,8 @@ def test_untappd_full_incremental_and_cap():
         r = by[c["id"]]
         assert r["beer_name"] == c["beer"] and r["brewery_name"] == c["brewery"], r
         assert r["user_rating"] == c["rating"] and "venue" not in r, r
+        assert r.get("venue_name") == c["venue"] and "purchase_venue" not in r, r  # where the beer was had is kept
+        assert not c["venue"] or (r["venue_id"] == "77" + c["id"][-2:] and r["venue_url"].startswith("https://untappd.com/v/")), r
         assert r["photo_url"] == c["photo"] and "comment" not in r, r
         assert (r.get("serving_type") or "") == c["serving"], r
         assert r["beer_id"] == c["bid"] and len(r["checkin_date"]) == 10, r  # day only, no clock time
@@ -145,6 +147,50 @@ def test_flavours_from_checkin_pages():
         b.close()
     assert store.records["1"]["flavors"] == "Juicy, Hazy"
     assert store.records["2"]["flavors"] is None and store.records["2"]["details_v"] == untappd.DETAILS_VERSION
+
+
+CHECKIN_PAGE = """<html><body><div class="checkin-top">
+  <a href="/user/sample"><img alt="Sample P"></a><p><a href="/user/sample">Sample P</a></p>
+  {venue}
+  <a href="/b/downtown-brown/166684"><img></a><p><a href="/b/downtown-brown/166684">Downtown Brown</a></p>
+  <p class="label">Flavor Profiles</p><div class="flavor"><ul><li><span>Malty</span></li></ul></div>
+  {bought}
+ </div><footer><a href="/v/somewhere-else/55">A venue in the footer</a></footer></body></html>"""
+BOUGHT = """<div><p><strong>Purchased From</strong></p><a href="https://untappd.com/v/corner-shop/733312"><img alt="logo"></a>
+  <a href="https://untappd.com/v/corner-shop/733312">Corner Shop</a><p>1 Example Ave Sampletown, ON</p><p>Category: Liquor Store</p></div>"""
+
+
+def test_venue_from_checkin_page_but_never_where_it_was_bought():
+    from playwright.sync_api import sync_playwright
+    from common import Store
+
+    home = '<p><a href="https://untappd.com/v/at-home/9917985">Untappd at Home</a></p>'
+    assert untappd.parse_venue(CHECKIN_PAGE.format(venue=home, bought=BOUGHT)) == {
+        "venue_name": "Untappd at Home", "venue_id": "9917985", "venue_url": "https://untappd.com/v/at-home/9917985"}
+    pub_ = '<p><a href="/v/the-sample-arms/1234"><img></a> <a href="/v/the-sample-arms/1234">The Sample Arms</a></p>'
+    assert untappd.parse_venue(CHECKIN_PAGE.format(venue=pub_, bought=""))["venue_name"] == "The Sample Arms"
+    # bought somewhere, drunk nowhere in particular: the shop must not be mistaken for the location
+    assert untappd.parse_venue(CHECKIN_PAGE.format(venue="", bought=BOUGHT)) == {}
+    assert untappd.parse_venue("<html><body><p>nothing</p></body></html>") == {}
+
+    base = serve({"v1.html": CHECKIN_PAGE.format(venue=home, bought=BOUGHT), "v2.html": CHECKIN_PAGE.format(venue="", bought=BOUGHT),
+                  "v3.html": "<html><body><p>tags missing today</p></body></html>"})
+    store = Store("backups/venue_test", "checkin_id", ["checkin_id"], drop=untappd.PRIVATE_FIELDS)
+    store.records = {
+        "1": {"checkin_id": "1", "checkin_url": f"{base}/v1.html", "checkin_date": "2026-01-03", "global_rating": 3.5, "details_v": 3, "flavors": "Old"},
+        "2": {"checkin_id": "2", "checkin_url": f"{base}/v2.html", "checkin_date": "2026-01-02", "global_rating": 3.5, "details_v": 3},
+        "3": {"checkin_id": "3", "checkin_url": f"{base}/v3.html", "checkin_date": "2026-01-01", "global_rating": 3.5, "details_v": 3,
+              "flavors": "Juicy", "venue_name": "Known from the feed", "venue_id": "9"},
+    }
+    with sync_playwright() as p:
+        b = p.chromium.launch()
+        untappd.enrich_details(b.new_page(), store, limit=10)  # older parser version: all three are re-read
+        b.close()
+    r = store.records
+    assert r["1"]["venue_name"] == "Untappd at Home" and r["1"]["venue_id"] == "9917985" and r["1"]["flavors"] == "Malty"
+    assert r["2"]["venue_name"] is None and "Corner Shop" not in json.dumps(r)
+    assert r["3"]["venue_name"] == "Known from the feed" and r["3"]["flavors"] == "Juicy"  # a thin page wipes nothing
+    assert all(x["details_v"] == untappd.DETAILS_VERSION for x in r.values())
 
 
 def test_unique_beer_added_from_checkins_when_list_lacks_it():
@@ -314,7 +360,8 @@ def test_native_exports_are_normalized():
     )
     (imports / "untappd_export.json").write_text(json.dumps([{
         "beer_name": "Export Ale", "brewery_name": "Export Co", "beer_type": "Pale Ale - American",
-        "beer_abv": "5.2", "beer_ibu": "40", "comment": "from export", "venue_name": "Home",
+        "beer_abv": "5.2", "beer_ibu": "40", "comment": "from export", "venue_name": "Home", "venue_city": "Toronto", "venue_lat": "43.65", "venue_lng": "-79.38",
+        "purchase_venue": "Corner Shop",
         "checkin_url": "https://untappd.com/c/1", "created_at": "2019-05-04 18:22:01",
         "rating_score": "3.75", "checkin_id": "1", "bid": "42", "photo_url": "",
         "global_weighted_rating_score": "3.66", "serving_type": "Can"}]))
@@ -324,6 +371,7 @@ def test_native_exports_are_normalized():
     assert m["user_rating"] == 10 and m["genres"] == "Action, Sci-Fi" and m["year"] == 1999
     e = {r["checkin_id"]: r for r in load("untappd_checkins")["items"]}["1"]
     assert e["abv"] == 5.2 and e["user_rating"] == 3.75 and e["checkin_date"] == "2019-05-04" and "comment" not in e
+    assert e["venue_name"] == "Home" and e["venue_city"] == "Toronto" and e["venue_lat"] == 43.65 and "purchase_venue" not in e
 
 
 def test_poster_backfill_marks_misses_and_skips_done(monkeypatch=None):

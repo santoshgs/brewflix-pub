@@ -64,6 +64,9 @@ def main() -> int:
                             "last_error": None}
             if name == "foursquare":
                 status[name].update({k: foursquare.LAST_RUN.get(k) for k in ("api_count", "stored_count")})
+            if name == "untappd":
+                status[name].update({k: untappd.LAST_RUN.get(k) for k in ("rss", "rss_added", "signed_in")})
+                status[name]["warning"] = untappd.warning()
         except Exception as e:  # keep going; record why
             traceback.print_exc()
             failed.append(name)

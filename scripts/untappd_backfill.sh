@@ -59,6 +59,9 @@ echo "Step 2 of 2 — downloading your full history (keep this tab open)…"
 # also open every check-in page once, logged in, to read your flavour tags
 UNTAPPD_DETAILS_PER_RUN=5000 python scraper/run_all.py --only untappd --full --headful
 
+# Keep the daily job's fallback sign-in fresh (the UNTAPPD_STORAGE_STATE secret)
+bash scripts/untappd_save_signin.sh --no-login || true
+
 # Safety checks before anything leaves this Codespace
 python - <<'PY'
 import json, sys

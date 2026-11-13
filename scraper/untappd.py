@@ -7,9 +7,15 @@ Usage:
   python scraper/untappd.py --login          # log in once, save the session
                                              # to .secrets/untappd_state.json
 
-Logged-out pagination is capped by Untappd after a few pages. A saved
-session (see --login) lifts that cap locally and, stored as the
-UNTAPPD_STORAGE_STATE GitHub secret, in the daily job too.
+Signed out, your Untappd profile shows only your 5 latest check-ins. Two
+things cover the rest:
+
+1. Your personal RSS feed (Untappd > Account settings > "View your RSS feed"),
+   stored as the UNTAPPD_RSS_URL secret. It lists your latest 25 check-ins;
+   each new one is read from its public check-in page. Nothing to sign in to.
+2. A saved Untappd sign-in (see --login), stored as the UNTAPPD_STORAGE_STATE
+   secret, as the fallback: signed in, the profile shows your whole history,
+   so the walk below picks up anything the feed no longer lists.
 """
 from __future__ import annotations
 
@@ -18,6 +24,7 @@ import os
 import random
 import re
 import time
+import urllib.request
 from pathlib import Path
 
 from bs4 import BeautifulSoup
@@ -94,6 +101,119 @@ def parse_venue(html: str) -> dict:
         if id(a) not in bought and a.get_text(strip=True):
             return _venue(a)
     return {}
+
+
+def rss_url() -> str | None:
+    return (os.environ.get("UNTAPPD_RSS_URL") or "").strip() or None
+
+
+def parse_rss(xml: str) -> list[dict]:
+    """Your check-ins from the RSS feed, newest first: id, link and day.
+
+    The feed's titles ("… is drinking a X by Y at Z") are only a rough guide,
+    because names can contain " by " or " at "; the check-in page is read for
+    the real details.
+    """
+    soup = BeautifulSoup(xml, "xml")
+    out = []
+    for it in soup.find_all("item"):
+        link = (it.find("link") or it.find("guid"))
+        href = link.get_text(strip=True) if link else ""
+        m = re.search(r"/checkin/(\d+)", href)
+        if not m:
+            continue
+        pub = it.find("pubDate")
+        out.append({"checkin_id": m.group(1), "checkin_url": href.split("?")[0],
+                    "checkin_date": local_date(pub.get_text(strip=True)) if pub else None})
+    return out
+
+
+def fetch_rss(url: str, tries: int = 3) -> str:
+    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/130 Safari/537.36",
+                                               "Accept": "application/rss+xml, application/xml, text/xml, */*"})
+    for attempt in range(1, tries + 1):
+        try:
+            with urllib.request.urlopen(req, timeout=30) as r:
+                return r.read().decode("utf-8", "replace")
+        except Exception as e:  # never print the URL: its key is private
+            if attempt == tries:
+                raise RuntimeError(f"Untappd RSS feed unreachable ({type(e).__name__} {getattr(e, 'code', '')})".strip()) from None
+            time.sleep(5 * attempt)
+    return ""
+
+
+def parse_checkin_page(html: str) -> dict:
+    """Everything the backup keeps, from one public check-in page."""
+    soup = BeautifulSoup(html, "lxml")
+    box = soup.select_one("[data-checkin-id]") or soup
+    info = box.select_one(".checkin-info") or box
+    beer_a = info.select_one(".beer p a[href*='/b/']") or info.select_one("a[href*='/b/']:not(.label)")
+    brewery_a = info.select_one(".beer span a")
+    caps = info.select_one(".caps[data-rating]")
+    serving = info.select_one(".serving span")
+    t = box.select_one("[data-gregtime]")
+    label_img = info.select_one("a.label img")
+    photo = None
+    if (big := box.select_one(".photo a.image-big")):
+        if m := re.search(r"url\((https://images\.untp\.beer/crop\?[^)]+)\)", big.get("style", "")):
+            photo = re.sub(r"width=\d+&height=\d+", "width=640&height=640", m.group(1).replace("&amp;", "&"))
+        photo = photo or big.get("data-image")
+    flavors = parse_flavors(html)
+    rec = {
+        "checkin_id": str(box.get("data-checkin-id")) if box is not soup and box.get("data-checkin-id") else None,
+        "beer_id": _id_from(beer_a.get("href") if beer_a else None, "b"),
+        "beer_name": beer_a.get_text(strip=True) if beer_a else None,
+        "brewery_name": brewery_a.get_text(strip=True) if brewery_a else None,
+        "user_rating": to_float(caps["data-rating"]) if caps and to_float(caps["data-rating"]) else None,
+        "serving_type": serving.get_text(strip=True) if serving else None,
+        "checkin_date": local_date(t.get("data-gregtime")) if t else None,
+        "photo_url": photo,
+        "label_url": _img(label_img),
+        "flavors": ", ".join(flavors) or None,
+        **parse_venue(html),
+    }
+    return rec
+
+
+def sync_rss(page, checkins: Store, delay: float = 1.5, known_before: set | None = None) -> dict:
+    """Add check-ins the RSS feed lists but the backup lacks. Returns what happened, for the status file."""
+    url = rss_url()
+    if not url:
+        return {"rss": "not set up"}
+    items = parse_rss(fetch_rss(url))
+    if not items:
+        raise RuntimeError("Untappd RSS feed had no check-ins in it (has the feed link changed?)")
+    # what the backup held when this run started (the profile walk may have just added some)
+    known_before = set(checkins.records) if known_before is None else known_before
+    todo = [it for it in items if it["checkin_id"] not in checkins.records]
+    added = 0
+    for it in todo:
+        try:
+            page.goto(it["checkin_url"], wait_until="domcontentloaded", timeout=45_000)
+            if is_challenge(page):
+                log("Untappd RSS: Cloudflare challenge on a check-in page; the rest wait for the next run")
+                break
+            rec = parse_checkin_page(page.content())
+        except Exception as e:
+            log(f"Untappd RSS: check-in {it['checkin_id']} didn't load ({e}); will retry next run")
+            continue
+        if not rec.get("beer_name"):
+            log(f"Untappd RSS: check-in {it['checkin_id']} page had no beer on it; will retry next run")
+            continue
+        rec.update(checkin_id=it["checkin_id"], checkin_url=it["checkin_url"], details_v=DETAILS_VERSION,
+                   checkin_date=rec.get("checkin_date") or it["checkin_date"])
+        added += checkins.upsert(rec, save_every=10)
+        time.sleep(random.uniform(delay, delay + 0.5))
+    # the feed holds 25: if even its oldest entry was new, older ones may have been missed
+    gap = bool(known_before) and items[-1]["checkin_id"] not in known_before
+    log(f"Untappd RSS: {len(items)} in the feed, {len(todo)} not yet backed up, {added} added"
+        + ("; the feed's oldest entry was new too, so some may be older than the feed reaches" if gap else ""))
+    return {"rss": "ok", "rss_added": added, "rss_gap": gap}
+
+
+def signed_in(page) -> bool:
+    """True when the open Untappd page belongs to a signed-in session."""
+    return bool(page.query_selector("a[href*='/logout'], a[href$='/account/settings'], a[href*='/notifications']"))
 
 
 def parse_checkins(html: str) -> list[dict]:
@@ -374,6 +494,20 @@ def login(state_path: str = STATE_PATH):
     log(f"saved session to {state_path} (keep it private — never commit it)")
 
 
+# filled by run() and read by run_all.py for status.json
+LAST_RUN: dict = {}
+
+
+def warning() -> str | None:
+    """Something worth showing on the site, though the run itself succeeded."""
+    if LAST_RUN.get("rss_gap") and not LAST_RUN.get("signed_in"):
+        return ("More check-ins than the RSS feed holds since the last run, and no working saved sign-in: "
+                "some may be missing. Run the Codespace backfill, or refresh the UNTAPPD_STORAGE_STATE secret.")
+    if LAST_RUN.get("rss") == "failed" and not LAST_RUN.get("signed_in"):
+        return f"{LAST_RUN.get('rss_error')}. Only the latest 5 check-ins could be checked."
+    return None
+
+
 def run(full: bool = False, headful: bool = False, profile_url: str | None = None, beers_url: str | None = None,
         details_limit: int = int(os.environ.get("UNTAPPD_DETAILS_PER_RUN", "120"))) -> int:
     from playwright.sync_api import sync_playwright
@@ -381,6 +515,8 @@ def run(full: bool = False, headful: bool = False, profile_url: str | None = Non
     checkins = Store(CFG["output_base"], "checkin_id", CHECKIN_FIELDS, sort_by="checkin_date", drop=PRIVATE_FIELDS, fix=fix_checkin)
     beers = Store("backups/untappd_beers", "beer_id", BEER_FIELDS, sort_by="last_checkin", fix=fix_beer)
     start = len(checkins)
+    known_at_start = set(checkins.records)
+    LAST_RUN.clear()
 
     with sync_playwright() as p:
         browser, ctx = launch(p, headless=not headful, storage_state=STATE_PATH)
@@ -400,7 +536,19 @@ def run(full: bool = False, headful: bool = False, profile_url: str | None = Non
                     log("Untappd beers: list not visible (login required?) — skipping; style/ABV not enriched")
                     continue
                 raise
+            if label == "check-ins":
+                LAST_RUN["signed_in"] = signed_in(page)
+                if Path(STATE_PATH).exists() and not LAST_RUN["signed_in"]:
+                    log("Untappd: the saved sign-in didn't work (expired?); only the latest 5 check-ins are visible here")
             _paginate(page, item_sel, more_sel, parse, store, full, headful, label)
+            if label == "check-ins":
+                # the profile feed shows only 5 signed out; the RSS feed lists 25
+                try:
+                    LAST_RUN.update(sync_rss(page, checkins, known_before=known_at_start))
+                except Exception as e:  # the profile walk above still counts
+                    LAST_RUN.update(rss="failed", rss_error=str(e))
+                    log(f"Untappd RSS: {e}")
+                checkins.save()
         try:
             enrich_details(page, checkins, limit=details_limit)
         except Exception as e:  # never lose the feed data over this extra step

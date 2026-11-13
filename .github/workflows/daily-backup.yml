@@ -50,6 +50,8 @@ jobs:
           UNTAPPD_DETAILS_PER_RUN: ${{ inputs.full && '600' || '120' }}
           # optional: Foursquare/Swarm check-ins through the API (skipped if unset)
           FOURSQUARE_TOKEN: ${{ secrets.FOURSQUARE_TOKEN }}
+          # optional: your Untappd RSS feed link (Account settings > View your RSS feed)
+          UNTAPPD_RSS_URL: ${{ secrets.UNTAPPD_RSS_URL }}
           # optional: private photo backup to Cloudflare R2 (skipped if unset)
           R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
           R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}

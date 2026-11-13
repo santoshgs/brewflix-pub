@@ -36,7 +36,7 @@ for r in old:
         rec["flavors"] = r.get("flavors")
         rec["details_v"] = r["details_v"]
         kept += bool(r.get("flavors"))
-store.save()  # cleaned: no venue, no comments, day-only dates
+store.save()  # cleaned: no comments, no purchase location, day-only dates
 print(f"Carried over flavour tags for {kept} check-ins.")
 PY
 fi

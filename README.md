@@ -84,12 +84,13 @@ GitHub Actions — daily                               Cloudflare
 
 ## Privacy and security
 
-Built to be safe in a public repo, as long as you don't turn on the Swarm
-backup there (a repo holding Swarm check-ins should be private; see below):
+Keep your own copy private once it holds check-ins: Untappd check-ins record
+where you had each beer, and Swarm check-ins are a location diary (see below).
 
-- **Never stored:** where you drank or bought a beer (venue, location,
-  coordinates) and your check-in comments. Check-in times are reduced to the
-  calendar day in your time zone.
+- **Stored for Untappd:** where you had the beer (the venue's name, such as
+  "Untappd at Home" or a bar), so check-ins can be lined up with Swarm.
+- **Never stored for Untappd:** where you bought a beer and your check-in
+  comments. Check-in times are reduced to the calendar day in your time zone.
 - **Images stay private.** They live only in your R2 bucket, never in git. The
   Worker serves them only to visitors signed in through Cloudflare Access, and
   checks the Access token's signature, audience and expiry itself. If Access
@@ -98,7 +99,7 @@ backup there (a repo holding Swarm check-ins should be private; see below):
   An optional Untappd login lives only inside your own Codespace and is
   git-ignored.
 - **Pushes are checked.** The Codespace script refuses to push if the backups
-  contain comments, venues or clock times.
+  contain comments, purchase locations or clock times.
 - **Forks and pull requests** can't reach your data or secrets: only a
   read-only test workflow runs for them.
 

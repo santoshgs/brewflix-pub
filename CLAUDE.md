@@ -4,7 +4,8 @@
   the top of `CHANGELOG.md` (under today's date heading), in the same commit.
   One entry per commit: a short title and a few plain sentences on what changed
   and why. Daily `backup: YYYY-MM-DD` data commits aren't listed.
-- **Privacy rules:** Untappd: never store venues, comments or clock times (see
+- **Privacy rules:** Untappd: keep where the beer was had (`venue_name`); never
+  store comments, where it was bought, or clock times (see
   `PRIVATE_FIELDS` and `fix_checkin` in `scraper/untappd.py`). Foursquare/Swarm:
   places, the owner's own comments, times and tagged friends are stored by
   design; never store likes or other people's comments (`DROP_FIELDS` in

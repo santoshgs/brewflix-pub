@@ -27,11 +27,13 @@ from common import ROOT, TARGETS, Store, is_challenge, launch, local_date, log, 
 
 CFG = TARGETS["untappd"]
 BASE = "https://untappd.com"
-CHECKIN_FIELDS = CFG["fields"] + ["flavors", "beer_id", "checkin_url", "label_url", "global_v"]
-# never stored: where you drank and what you wrote are personal, not needed for a beer log
-PRIVATE_FIELDS = ("comment", "venue", "venue_name", "purchase_venue", "venue_city", "venue_state", "venue_country", "venue_lat", "venue_lng")
+CHECKIN_FIELDS = CFG["fields"] + ["flavors", "beer_id", "checkin_url", "label_url", "global_v", "venue_name", "venue_id", "venue_url"]
+# Where you had the beer (venue_name, e.g. "Untappd at Home") is kept, so check-ins can be lined up
+# with Swarm and other data. Never stored: what you wrote, and where you bought the beer.
+# ("venue" is the old name of the location field; it stays dropped so only venue_name is used.)
+PRIVATE_FIELDS = ("comment", "venue", "purchase_venue")
 # bump when the check-in page parser improves, so old check-ins get re-read
-DETAILS_VERSION = 3  # 3: global rating read from the beer page's rating row
+DETAILS_VERSION = 4  # 4: where you had the beer (venue) read from the check-in page
 BEER_FIELDS = [
     "beer_id", "beer_name", "brewery_name", "style", "abv", "ibu", "user_rating",
     "global_rating", "checkin_count", "first_checkin", "last_checkin", "beer_url", "label_url",
@@ -69,6 +71,31 @@ def _iso(s: str | None) -> str | None:
         return s
 
 
+VENUE_HREF = re.compile(r"(?:^|untappd\.com)/v/[^/?#]+/(\d+)")
+PURCHASED = re.compile(r"purchased\s+(?:from|at)", re.I)
+
+
+def _venue(a) -> dict:
+    return {"venue_name": a.get_text(" ", strip=True), "venue_id": VENUE_HREF.search(a["href"]).group(1),
+            "venue_url": _abs(a["href"])}
+
+
+def parse_venue(html: str) -> dict:
+    """Where the beer was had, from a single check-in page: the venue link under your name.
+
+    The page can also show a "Purchased From" block with its own venue link;
+    that is where the beer was bought, and it is never read. Returns {} when
+    the check-in has no location.
+    """
+    soup = BeautifulSoup(html, "lxml")
+    label = soup.find(string=PURCHASED)
+    bought = {id(a) for a in label.find_all_next("a", href=VENUE_HREF)} if label else set()
+    for a in soup.find_all("a", href=VENUE_HREF):
+        if id(a) not in bought and a.get_text(strip=True):
+            return _venue(a)
+    return {}
+
+
 def parse_checkins(html: str) -> list[dict]:
     soup = BeautifulSoup(html, "lxml")
     out = []
@@ -84,8 +111,10 @@ def parse_checkins(html: str) -> list[dict]:
         t = item.select_one("a.time[data-gregtime], .time[data-gregtime], [data-gregtime]")
         link = item.select_one("a[href*='/checkin/']")
         label_img = item.select_one("a.label img, .label img")
+        venue_a = next((a for a in text.select("a") if VENUE_HREF.search(a.get("href", "")) and a.get_text(strip=True)), None)
         out.append(
             {
+                **(_venue(venue_a) if venue_a else {}),
                 "checkin_id": str(cid),
                 "beer_id": _id_from(beer_a.get("href") if beer_a else None, "b"),
                 "beer_name": beer_a.get_text(strip=True) if beer_a else None,
@@ -220,14 +249,14 @@ def _rating_row_markup(html: str) -> str:
 
 
 def enrich_details(page, checkins: Store, limit: int) -> int:
-    """Open individual check-in pages (oldest-unread first) to read flavour tags."""
+    """Open individual check-in pages (newest-unread first) to read flavour tags and where the beer was had."""
     # re-read when the page parser has changed, or once more if the global rating is still missing
     todo = [r for r in checkins.records.values() if r.get("checkin_url") and (
         r.get("details_v") != DETAILS_VERSION
         or (r.get("global_rating") in (None, "") and r.get("global_v") != DETAILS_VERSION))]
     todo.sort(key=lambda r: str(r.get("checkin_date") or ""), reverse=True)
     todo = todo[:limit]
-    found = globals_found = done = 0
+    found = globals_found = done = venues = 0
     logged_markup = False
     for i, rec in enumerate(todo, 1):
         try:
@@ -244,7 +273,15 @@ def enrich_details(page, checkins: Store, limit: int) -> int:
             # help future parser fixes: show the markup around the word
             log("Untappd details: 'flavor' found but no tags parsed; context:\n"
                 + html[max(0, m.start() - 300): m.start() + 600])
-        rec["flavors"] = ", ".join(flavors) or None
+        if flavors or not rec.get("flavors"):  # a page that loads without its tags doesn't wipe ones already saved
+            rec["flavors"] = ", ".join(flavors) or None
+        venue = parse_venue(html)
+        if venue:
+            rec.update(venue)
+        else:
+            for f in ("venue_name", "venue_id", "venue_url"):
+                rec.setdefault(f, None)  # no location on this check-in (or already known from the feed)
+        venues += bool(venue)
         if rec.get("global_rating") in (None, ""):
             rec["global_v"] = DETAILS_VERSION  # one try per version, so a rating that never appears isn't re-read daily
             rec["global_rating"] = parse_global(html)
@@ -272,7 +309,7 @@ def enrich_details(page, checkins: Store, limit: int) -> int:
             log(f"Untappd details: {i}/{len(todo)} read, {found} with flavours, {globals_found} with global rating")
         time.sleep(random.uniform(1.5, 2.0))
     if todo:
-        log(f"Untappd details: read {done} of {len(todo)} check-in pages, {found} had flavour tags, {globals_found} global ratings filled")
+        log(f"Untappd details: read {done} of {len(todo)} check-in pages, {found} had flavour tags, {venues} had a location, {globals_found} global ratings filled")
     return found
 
 

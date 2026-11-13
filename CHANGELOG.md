@@ -4,6 +4,19 @@ Every commit to Brewflix gets its own entry here, newest first, added in the
 same commit as the change. In your own copy, the backup job's daily data
 commits (`backup: YYYY-MM-DD`) only update `backups/` and aren't listed.
 
+## 2026-11-13
+
+### Keep where an Untappd beer was had
+Untappd check-ins now record their location (`venue_name`, `venue_id`,
+`venue_url`; for example "Untappd at Home" or a bar), so they can be lined up
+with Swarm check-ins and other data. New check-ins get it from the feed;
+existing ones are re-read from their check-in pages, 120 per daily run, or 600
+on a manual run with *full* ticked. An Untappd data export also supplies the
+venue's city and coordinates. The site shows the location under each beer and
+search finds it. Comments, where a beer was bought, and clock times are still
+never stored. A check-in page that loads without its flavour tags no longer
+wipes tags already saved.
+
 ## 2026-11-11
 
 ### Tips and photos pop-overs, date range filter, icons on every tab

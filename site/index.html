@@ -347,7 +347,9 @@ async function init() {
   for (const [svc, name] of [["imdb", "IMDb"], ["untappd", "Untappd"], ["foursquare", "Foursquare"]]) {
     const s = status?.[svc];
     if (!s) continue;
-    pills.push(s.ok
+    pills.push(s.ok && s.warning
+      ? `<span class="pill bad" title="${esc(s.warning)}">${name}: <b>may be missing check-ins</b> · synced ${ago(s.last_success)}</span>`
+      : s.ok
       ? `<span class="pill ok">${name}: <b>synced ${ago(s.last_success)}</b> · +${s.added_last_run ?? 0} last run</span>`
       : `<span class="pill bad" title="${esc(s.last_error)}">${name}: <b>last run failed</b> · good copy from ${ago(s.last_success)}</span>`);
   }

@@ -214,3 +214,42 @@ def fsq_tip(i):
     if i % 4 == 0:
         tip["photo"] = {"prefix": "https://fastly.4sqi.net/img/general/", "suffix": f"/tip_{i}.jpg"}
     return tip
+
+
+# ---- Untappd RSS feed and single check-in pages (layout as on untappd.com, invented data) ----
+def untappd_rss(checkins, base):
+    items = "".join(f"""
+    <item>
+      <title>Demo D. is drinking a {c['beer']} by  {c['brewery']}{' at ' + c['venue'] if c['venue'] else ''}</title>
+      <link>{base}/checkin/{c['id']}.html</link>
+      <guid>{base}/checkin/{c['id']}.html</guid>
+      <description><![CDATA[<br /> <img height="200" width="200" src="https://images.untp.beer/crop?width=200&height=200&url=x.jpg">]]></description>
+      <pubDate>{c['when']}</pubDate>
+    </item>""" for c in checkins)
+    return f"""<?xml version="1.0" encoding="utf-8"?>
+<rss version="2.0" xmlns:dc="http://purl.org/dc/elements/1.1/"><channel><title>Demo's Untappd</title>{items}</channel></rss>"""
+
+
+def untappd_checkin_page(c, bought=None):
+    venue = f'<p class="location">\n<a href="/v/{c["venue"].lower().replace(" ", "-")}/77{c["id"][-2:]}">{c["venue"]}</a> </p>' if c["venue"] else ""
+    caps = f'<div class="caps" data-rating="{c["rating"]}"><div class="cap cap-100"></div></div>' if c["rating"] is not None else ""
+    serving = f'<p class="serving"><img alt="{c["serving"]}" src="x.png"/>\n<span>{c["serving"]} </span>\n</p>' if c["serving"] else ""
+    photo = (f'<div class="photo photo-container-remove"><div class="inner"><a class="image-big" data-image="https://assets.untappd.com/photos/p_{c["id"]}_raw.jpg" '
+             f'style="background-image: url(https://images.untp.beer/crop?width=1280&amp;height=1280&amp;stripmeta=true&amp;url=https://untappd.s3.amazonaws.com/photos/p_{c["id"]}_raw.jpg)"></a></div></div>') if c["photo"] else ""
+    shop = (f'<div class="purchased"><p><strong>Purchased From</strong></p><div class="purchased-location"><a href="/v/shop/4242"><img alt="logo"/></a>'
+            f'<div><p><a href="/v/shop/4242">{bought}</a></p><p class="sub-purchased">1 Example Ave</p></div></div></div>') if bought else ""
+    return f"""<!doctype html><html><head><title>Demo is drinking a {c['beer']} by {c['brewery']} on Untappd</title></head><body>
+<div class="indiv_item" data-checkin-id="{c['id']}"><div class="checkin box">
+ <div class="user-info pad-it"><div class="avatar"><a href="/user/demo"><img alt="User avatar"/></a></div>
+  <div class="name"><p><a href="/user/demo">Demo D.</a></p>{venue}</div></div>
+ {photo}
+ <div class="checkin-info pad-it">
+  <a class="label" href="/b/x-y/{c['bid']}"><img alt="label" src="https://assets.untappd.com/site/beer_logos/beer-{c['bid']}.jpeg"/></a>
+  <div class="beer"><p><a href="/b/x-y/{c['bid']}">{c['beer']}</a></p><span><a href="/{c['brewery_slug']}">{c['brewery']}</a></span></div>
+  <p class="comment"><abbr id="translate_{c['id']}">{c['comment']}</abbr></p>
+  <div class="rating-serving">{serving}{caps}</div>
+ </div>
+ <div class="flavor"><p><strong>Flavor Profile</strong></p><ul><li><span>Malty</span></li><li><span>Smooth</span></li></ul></div>
+ {shop}
+ <p class="time" data-gregtime="{c['when']}">2 hours ago</p>
+</div></div></body></html>"""

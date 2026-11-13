@@ -651,6 +651,71 @@ def test_location_diary_never_ships_with_placeholder_targets():
         assert not list((root / "backups").glob("foursquare_*")), "Swarm data found in a repo with placeholder targets"
 
 
+def test_rss_feed_fills_in_what_the_signed_out_profile_hides():
+    """Signed out, the profile shows 5 check-ins; the RSS feed lists 25 and each is read from its page."""
+    burst = fx.UNTAPPD_CHECKINS[:30]
+    (SITE / "checkin").mkdir(parents=True, exist_ok=True)
+    base = serve({"profile5.html": fx.untappd_profile(burst[:5], page_size=5), "beers.html": fx.untappd_beers_page(burst),
+                  **{f"checkin/{c['id']}.html": fx.untappd_checkin_page(c, bought="Corner Shop") for c in burst}})
+    (SITE / "feed.xml").write_text(fx.untappd_rss(burst[:25], base))
+    for f in (TMP / "backups").glob("untappd_*"):
+        f.unlink()
+    os.environ["UNTAPPD_RSS_URL"] = f"{base}/feed.xml"
+    try:
+        untappd.run(full=False, profile_url=f"{base}/profile5.html", beers_url=f"{base}/beers.html", details_limit=0)
+        data = {r["checkin_id"]: r for r in load("untappd_checkins")["items"]}
+        assert len(data) == 25, len(data)  # 5 from the profile, the other 20 through the feed
+        for c in burst[:25]:
+            r = data[c["id"]]
+            assert r["beer_name"] == c["beer"] and r["brewery_name"] == c["brewery"] and r["beer_id"] == c["bid"], r
+            assert r["user_rating"] == c["rating"] and (r.get("serving_type") or "") == c["serving"], r
+            assert r.get("venue_name") == c["venue"] and len(r["checkin_date"]) == 10, r
+            assert "comment" not in r and "Corner Shop" not in json.dumps(r), r  # what you wrote, and the shop, stay out
+        with_photo = data[next(c["id"] for c in burst[5:25] if c["photo"])]
+        assert with_photo["photo_url"].startswith("https://images.untp.beer/crop?width=640&height=640&")
+        assert data[burst[6]["id"]]["flavors"] == "Malty, Smooth" and data[burst[6]["id"]]["details_v"] == untappd.DETAILS_VERSION
+        assert untappd.LAST_RUN["rss"] == "ok" and untappd.LAST_RUN["rss_added"] == 20 and untappd.warning() is None
+
+        # five more since: all picked up, nothing else re-read
+        (SITE / "profile5.html").write_text(fx.untappd_profile(burst[:5], page_size=5))
+        newer = [dict(c, id=str(990000 + i), when="Sat, 14 Nov 2026 03:0%d:00 +0000" % i) for i, c in enumerate(burst[25:30])]
+        for c in newer:
+            (SITE / "checkin" / f"{c['id']}.html").write_text(fx.untappd_checkin_page(c))
+        (SITE / "feed.xml").write_text(fx.untappd_rss((newer + burst)[:25], base))
+        untappd.run(full=False, profile_url=f"{base}/profile5.html", beers_url=f"{base}/beers.html", details_limit=0)
+        assert load("untappd_checkins")["count"] == 30 and untappd.LAST_RUN["rss_added"] == 5 and not untappd.LAST_RUN["rss_gap"]
+
+        # more than 25 since the last run and no saved sign-in: flagged on the site
+        many = [dict(c, id=str(980000 + i)) for i, c in enumerate(burst[:26])]
+        for c in many:
+            (SITE / "checkin" / f"{c['id']}.html").write_text(fx.untappd_checkin_page(c))
+        (SITE / "feed.xml").write_text(fx.untappd_rss(many[:25], base))
+        untappd.run(full=False, profile_url=f"{base}/profile5.html", beers_url=f"{base}/beers.html", details_limit=0)
+        assert untappd.LAST_RUN["rss_gap"] and "RSS feed holds" in (untappd.warning() or "")
+
+        # feed down: the run still succeeds, with a warning
+        os.environ["UNTAPPD_RSS_URL"] = f"{base}/gone.xml"
+        untappd.run(full=False, profile_url=f"{base}/profile5.html", beers_url=f"{base}/beers.html", details_limit=0)
+        assert untappd.LAST_RUN["rss"] == "failed" and "gone" not in untappd.warning() and "unreachable" in untappd.warning()
+    finally:
+        os.environ.pop("UNTAPPD_RSS_URL", None)
+    untappd.LAST_RUN.clear()
+    os.environ.pop("UNTAPPD_RSS_URL", None)
+    assert untappd.run(full=False, profile_url=f"{base}/profile5.html", beers_url=f"{base}/beers.html", details_limit=0) == 0
+    assert untappd.LAST_RUN["rss"] == "not set up"
+
+
+def test_checkin_page_parser_matches_the_real_layout():
+    c = dict(fx.UNTAPPD_CHECKINS[0], venue="Untappd at Home", rating=3.25, serving="Can", photo="x")
+    r = untappd.parse_checkin_page(fx.untappd_checkin_page(c, bought="Corner Shop"))
+    assert r["checkin_id"] == c["id"] and r["beer_name"] == c["beer"] and r["brewery_name"] == c["brewery"]
+    assert r["user_rating"] == 3.25 and r["serving_type"] == "Can" and r["venue_name"] == "Untappd at Home"
+    assert r["label_url"].endswith(f"beer-{c['bid']}.jpeg") and r["flavors"] == "Malty, Smooth"
+    assert "&amp;" not in r["photo_url"] and "width=640" in r["photo_url"]
+    unrated = untappd.parse_checkin_page(fx.untappd_checkin_page(dict(c, rating=None, venue=None, photo=None)))
+    assert unrated["user_rating"] is None and unrated.get("venue_name") is None and unrated["photo_url"] is None
+
+
 if __name__ == "__main__":
     for name, fn in list(globals().items()):
         if name.startswith("test_"):

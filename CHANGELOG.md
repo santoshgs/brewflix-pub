@@ -6,6 +6,17 @@ commits (`backup: YYYY-MM-DD`) only update `backups/` and aren't listed.
 
 ## 2026-11-13
 
+### Catch every Untappd check-in through the RSS feed
+Signed out, the Untappd profile shows only the latest 5 check-ins, so a night
+with more than that lost some. Each run now reads your Untappd RSS feed
+(secret `UNTAPPD_RSS_URL`, latest 25 check-ins) and opens the public page of
+any check-in not yet backed up for its beer, rating, serving, location, photo
+and flavour tags. A saved Untappd sign-in (secret `UNTAPPD_STORAGE_STATE`,
+stored by the new `scripts/untappd_save_signin.sh`) remains the fallback for
+more than 25 check-ins between runs. If neither can cover a gap, the run still
+passes and the site's Untappd status says check-ins may be missing. The feed
+link is never written to the log.
+
 ### Keep where an Untappd beer was had
 Untappd check-ins now record their location (`venue_name`, `venue_id`,
 `venue_url`; for example "Untappd at Home" or a bar), so they can be lined up

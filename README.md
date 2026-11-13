@@ -207,6 +207,29 @@ Codespace's history differs from GitHub's, run:
 git fetch origin main && git show FETCH_HEAD:scripts/codespace_resync.sh | bash
 ```
 
+## Untappd: catching every check-in
+
+Signed out, your Untappd profile shows only your latest 5 check-ins, so on a
+night with more than that the daily run would miss some. Two things cover it:
+
+1. **Your RSS feed (main route).** Untappd → Account settings → *View your RSS
+   feed*; save that link as the repository secret **`UNTAPPD_RSS_URL`**. It
+   lists your latest 25 check-ins. Each run reads it and opens the public page
+   of any check-in not yet backed up, for the beer, rating, serving, location,
+   photo and flavour tags. Nothing to sign in to, nothing that expires. The
+   link contains a private key, so it is never printed in the run log.
+2. **A saved sign-in (fallback).** Signed in, the profile shows your whole
+   history, so the run walks back until it reaches check-ins already saved.
+   That covers more than 25 check-ins between runs, or the feed being down. In
+   the Codespace run `bash scripts/untappd_save_signin.sh`; it logs in (on the
+   browser desktop, port 6080) if needed and stores the sign-in as the secret
+   **`UNTAPPD_STORAGE_STATE`**. Untappd ends sessions now and then: run it with
+   `--relogin` when the site says so. The Codespace backfill refreshes it too.
+
+If more than 25 check-ins arrive between runs and the saved sign-in isn't
+working, the run still succeeds but the Untappd status on the site turns red
+with *may be missing check-ins*; the Codespace backfill fills the gap.
+
 ## Foursquare / Swarm check-ins
 
 Unlike the other two services this one uses Foursquare's API, not a browser,
@@ -304,6 +327,8 @@ than are stored, run once with *full* ticked or add the data export.
 
 | Setting | Where | Default |
 |---|---|---|
+| `UNTAPPD_RSS_URL` | GitHub secret | Untappd feed link; without it only the latest 5 check-ins are seen signed out |
+| `UNTAPPD_STORAGE_STATE` | GitHub secret | saved Untappd sign-in, the fallback |
 | `FOURSQUARE_TOKEN` | GitHub secret | Swarm backup skipped when missing |
 | `FSQ_PHOTOS_PER_RUN` | env | `600` Swarm photos copied per run |
 | `BACKUP_TZ` | env / repo variable | `UTC`: day used for check-in dates |

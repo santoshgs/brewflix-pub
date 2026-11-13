@@ -46,6 +46,8 @@ jobs:
         id: scrape
         continue-on-error: true
         env:
+          # a manual run with "full" ticked also re-reads more check-in pages (flavours, location)
+          UNTAPPD_DETAILS_PER_RUN: ${{ inputs.full && '600' || '120' }}
           # optional: Foursquare/Swarm check-ins through the API (skipped if unset)
           FOURSQUARE_TOKEN: ${{ secrets.FOURSQUARE_TOKEN }}
           # optional: private photo backup to Cloudflare R2 (skipped if unset)

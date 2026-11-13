@@ -220,6 +220,7 @@ const VIEWS = {
       ["beer_name", "Beer", r => withThumb(labelOf(r), "label",
         `<a href="${r.checkin_url || "#"}" target="_blank" rel="noopener">${esc(r.beer_name)}</a><div class="sub">${esc(r.brewery_name || "")}${r.style ? " · " + esc(r.style) : ""}</div>`
         + `<div class="sub sm-only">${[shortDay(r.checkin_date), r.serving_type, strength(r)].filter(Boolean).map(esc).join(" · ")}</div>`
+        + (r.venue_name ? `<div class="sub">at ${esc(r.venue_name)}${r.venue_city ? ` · ${esc(r.venue_city)}` : ""}</div>` : "")
         + (r.comment ? `<div class="sub">“${esc(r.comment)}”</div>` : "")
         + (r.flavors ? `<div class="flav">${r.flavors.split(/,\s*/).map(f => `<span>${esc(f)}</span>`).join("")}</div>` : ""),
         photoOf(r))],
